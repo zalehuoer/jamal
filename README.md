@@ -57,70 +57,66 @@
 
 ## 📦 安装
 
-### 方式一：一键安装（推荐）
+### 环境要求
 
-1. **克隆项目**
-
-```powershell
-git clone https://github.com/zalehuoer/jamal.git
-cd jamal
-```
-
-2. **运行安装脚本**
-
-```powershell
-.\install.bat
-```
-
-> 脚本会自动检查并安装：
-> - Visual Studio Build Tools（C++ 编译工具）
-> - Rust 编译器
-> - Node.js
-> - npm 依赖
-
-3. **重启终端**（如果安装了新组件）
-
-4. **再次运行脚本**（确认所有依赖已安装）
-
-```powershell
-.\install.bat
-```
+| 依赖 | 说明 |
+|------|------|
+| **Visual Studio Build Tools** | C++ 编译工具（必须手动安装） |
+| **Rust** | 1.70+ |
+| **Node.js** | 18+ |
 
 ---
 
-### 方式二：手动安装
+### 第一步：安装 Visual Studio Build Tools（必须）
 
-#### 1. 安装 Visual Studio Build Tools
+> ⚠️ **重要**：这一步必须手动完成，自动安装通常无法正确配置 C++ 组件。
 
-```powershell
-winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --quiet --wait"
+1. 访问 https://visualstudio.microsoft.com/visual-cpp-build-tools/
+2. 点击 **"下载 Build Tools"**
+3. 运行下载的安装程序
+4. 在安装界面中，**勾选 "Desktop development with C++"**（使用 C++ 的桌面开发）
+5. 点击 **"安装"**，等待完成（约 10-20 分钟）
+6. **重启电脑**
+
+#### 验证安装
+
+打开 **"Developer Command Prompt for VS"**（开始菜单搜索），运行：
+
+```cmd
+cl.exe
 ```
 
-#### 2. 安装 Rust
+如果显示版本信息，说明安装成功。
+
+---
+
+### 第二步：安装 Rust 和 Node.js
 
 ```powershell
+# 安装 Rust
 winget install Rustlang.Rustup
-```
 
-#### 3. 安装 Node.js
-
-```powershell
+# 安装 Node.js
 winget install OpenJS.NodeJS.LTS
 ```
 
-#### 4. 克隆项目并安装依赖
+安装后**重启终端**。
+
+---
+
+### 第三步：克隆项目并运行
 
 ```powershell
+# 克隆项目
 git clone https://github.com/zalehuoer/jamal.git
-cd jamal/server
+cd jamal
+
+# 运行安装脚本（自动安装 npm 依赖）
+.\install.bat
+
+# 或手动安装依赖
+cd server
 npm install
-```
-
-#### 5. 验证安装
-
-```powershell
-rustc --version   # 应显示 rustc 1.7x.x
-node --version    # 应显示 v18.x 或更高
 ```
 
 ---
