@@ -146,6 +146,42 @@ npm run tauri dev
 
 ---
 
+## 🌐 使用 HTTPS（通过 ngrok）
+
+### 1. 安装 ngrok
+
+访问 https://ngrok.com/download 下载并安装。
+
+### 2. 启动 ngrok 转发
+
+```powershell
+# 确保在运行 Server 的同一台机器上执行
+ngrok http 127.0.0.1:4444
+```
+
+ngrok 会显示类似这样的地址：
+```
+Forwarding  https://abc123.ngrok-free.app -> http://localhost:4444
+```
+
+### 3. 生成 Implant（使用 ngrok 地址）
+
+| 配置项 | 值 |
+|--------|-----|
+| 服务器地址 | `abc123.ngrok-free.app`（不带 https://） |
+| 端口 | `443` |
+| 使用 HTTPS | ✅ 勾选 |
+
+### 4. 部署 Implant
+
+```powershell
+.\implant.exe -k <key>
+```
+
+> ⚠️ **注意**：ngrok 和 Server 必须在**同一台机器**上运行，否则会出现 502 错误。
+
+---
+
 ## 🔒 安全机制
 
 ### 加密
