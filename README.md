@@ -55,60 +55,72 @@
 
 ---
 
-## � 安装
+## 📦 安装
 
-### 环境要求
+### 方式一：一键安装（推荐）
 
-| 依赖 | 版本 | 说明 |
-|------|------|------|
-| **Rust** | 1.70+ | `rustup` 安装 |
-| **Node.js** | 18+ | npm 包管理 |
-| **Tauri CLI** | 2.x | Tauri 构建工具 |
-
-### 1. 安装 Rust
+1. **克隆项目**
 
 ```powershell
-# Windows: 下载并运行 rustup-init.exe
-# https://rustup.rs/
+git clone https://github.com/zalehuoer/jamal.git
+cd jamal
+```
 
-# 或使用 winget
+2. **运行安装脚本**
+
+```powershell
+.\install.bat
+```
+
+> 脚本会自动检查并安装：
+> - Visual Studio Build Tools（C++ 编译工具）
+> - Rust 编译器
+> - Node.js
+> - npm 依赖
+
+3. **重启终端**（如果安装了新组件）
+
+4. **再次运行脚本**（确认所有依赖已安装）
+
+```powershell
+.\install.bat
+```
+
+---
+
+### 方式二：手动安装
+
+#### 1. 安装 Visual Studio Build Tools
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Component.VC.Tools.x86.x64 --quiet --wait"
+```
+
+#### 2. 安装 Rust
+
+```powershell
 winget install Rustlang.Rustup
 ```
 
-### 2. 安装 Node.js
+#### 3. 安装 Node.js
 
 ```powershell
 winget install OpenJS.NodeJS.LTS
 ```
 
-### 3. 克隆项目
+#### 4. 克隆项目并安装依赖
 
 ```powershell
-git clone https://github.com/zalehuoer/jamalC2.git
-cd jamalC2
-```
-
-### 4. 安装依赖
-
-```powershell
-# Server 前端依赖
-cd server
+git clone https://github.com/zalehuoer/jamal.git
+cd jamal/server
 npm install
-
-# 返回根目录
-cd ..
 ```
 
-### 5. 验证安装
+#### 5. 验证安装
 
 ```powershell
-# 验证 Rust
-rustc --version
-cargo --version
-
-# 验证 Node
-node --version
-npm --version
+rustc --version   # 应显示 rustc 1.7x.x
+node --version    # 应显示 v18.x 或更高
 ```
 
 ---

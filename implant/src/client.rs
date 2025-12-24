@@ -113,7 +113,7 @@ pub struct Client {
 impl Client {
     pub fn new() -> Self {
         // 从配置创建加密器
-        let crypto = Crypto::from_hex(config::ENCRYPTION_KEY)
+        let crypto = Crypto::from_hex(config::get_encryption_key())
             .expect("Invalid encryption key in config");
         
         // 创建同步 HTTP 客户端（支持 HTTPS）

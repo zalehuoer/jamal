@@ -28,7 +28,7 @@ pub fn collect_system_info() -> ClientIdentification {
         country: "Unknown".to_string(),
         username,
         pc_name: hostname,
-        tag: crate::config::TAG.to_string(),
+        tag: crate::config::get_tag().to_string(),
     }
 }
 

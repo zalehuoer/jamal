@@ -170,6 +170,13 @@ pub fn get_http_url() -> String {{
     let scheme = if USE_TLS {{ "https" }} else {{ "http" }};
     format!("{{}}://{{}}:{{}}", scheme, SERVER_HOST, SERVER_PORT)
 }}
+
+// 兼容函数
+pub fn get_server_host() -> &'static str {{ SERVER_HOST }}
+pub fn get_server_port() -> u16 {{ SERVER_PORT }}
+pub fn get_use_tls() -> bool {{ USE_TLS }}
+pub fn get_tag() -> &'static str {{ TAG }}
+pub fn get_encryption_key() -> &'static str {{ ENCRYPTION_KEY }}
 "#, request.server_host, request.server_port, request.use_tls, request.tag, request.encryption_key)
 }
 

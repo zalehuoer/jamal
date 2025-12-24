@@ -1,66 +1,73 @@
 @echo off
-chcp 65001 >nul
+chcp 65001 >nul 2>&1
 echo ========================================
-echo   JamalC2 一键安装脚本
+echo   JamalC2 Setup Script
 echo ========================================
 echo.
 
-:: 检查 Rust
-echo [1/4] 检查 Rust...
+:: Check Visual Studio Build Tools (check installation folder)
+echo [1/5] Checking Visual Studio Build Tools...
+if exist "%ProgramFiles%\Microsoft Visual Studio\2022\BuildTools" (
+    echo [OK] VS Build Tools 2022 installed
+) else if exist "%ProgramFiles(x86)%\Microsoft Visual Studio\2022\BuildTools" (
+    echo [OK] VS Build Tools 2022 installed
+) else if exist "%ProgramFiles%\Microsoft Visual Studio\2019\BuildTools" (
+    echo [OK] VS Build Tools 2019 installed
+) else (
+    echo [!] VS Build Tools not found, installing...
+    echo [i] This may take 10-20 minutes...
+    winget install Microsoft.VisualStudio.2022.BuildTools --override "--add Microsoft.VisualStudio.Workload.VCTools --quiet --wait" --accept-source-agreements --accept-package-agreements
+    echo [i] Please restart your computer and run this script again
+    pause
+    exit /b 0
+)
+
+:: Check Rust
+echo [2/5] Checking Rust...
 where rustc >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Rust 未安装，正在安装...
+    echo [!] Rust not installed, installing...
     winget install Rustlang.Rustup -e --accept-source-agreements --accept-package-agreements
-    if %errorlevel% neq 0 (
-        echo [X] Rust 安装失败，请手动访问 https://rustup.rs/
-        pause
-        exit /b 1
-    )
-    echo [i] 请重新打开终端后再次运行此脚本
+    echo [i] Please restart terminal and run this script again
     pause
     exit /b 0
 ) else (
-    for /f "tokens=2" %%i in ('rustc --version') do echo [√] Rust %%i 已安装
+    echo [OK] Rust installed
 )
 
-:: 检查 Node.js
-echo [2/4] 检查 Node.js...
+:: Check Node.js
+echo [3/5] Checking Node.js...
 where node >nul 2>&1
 if %errorlevel% neq 0 (
-    echo [!] Node.js 未安装，正在安装...
+    echo [!] Node.js not installed, installing...
     winget install OpenJS.NodeJS.LTS -e --accept-source-agreements --accept-package-agreements
-    if %errorlevel% neq 0 (
-        echo [X] Node.js 安装失败，请手动访问 https://nodejs.org/
-        pause
-        exit /b 1
-    )
-    echo [i] 请重新打开终端后再次运行此脚本
+    echo [i] Please restart terminal and run this script again
     pause
     exit /b 0
 ) else (
-    for /f "tokens=1" %%i in ('node --version') do echo [√] Node.js %%i 已安装
+    echo [OK] Node.js installed
 )
 
-:: 安装前端依赖
-echo [3/4] 安装 Server 前端依赖...
+:: Install frontend dependencies
+echo [4/5] Installing Server dependencies...
 cd /d "%~dp0server"
 if not exist node_modules (
     call npm install
     if %errorlevel% neq 0 (
-        echo [X] npm install 失败
+        echo [X] npm install failed
         pause
         exit /b 1
     )
 ) else (
-    echo [√] 依赖已存在，跳过
+    echo [OK] Dependencies exist, skipping
 )
 cd /d "%~dp0"
 
-:: 完成
-echo [4/4] 安装完成！
+:: Done
+echo [5/5] Installation complete!
 echo.
 echo ========================================
-echo   使用方法:
+echo   Usage:
 echo   1. cd server
 echo   2. npm run tauri dev
 echo ========================================

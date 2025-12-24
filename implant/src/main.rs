@@ -36,8 +36,8 @@ fn main() {
     #[cfg(debug_assertions)]
     {
         println!("[*] JamalC2 Implant v{}", config::VERSION);
-        println!("[*] Server: {}:{}", config::SERVER_HOST, config::SERVER_PORT);
-        println!("[*] Tag: {}", config::TAG);
+        println!("[*] Server: {}:{}", config::get_server_host(), config::get_server_port());
+        println!("[*] Tag: {}", config::get_tag());
     }
     
     let mut client = Client::new();
