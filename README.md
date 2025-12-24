@@ -84,7 +84,7 @@ winget install OpenJS.NodeJS.LTS
 ### 3. 克隆项目
 
 ```powershell
-git clone https://github.com/你的用户名/jamalC2.git
+git clone https://github.com/zalehuoer/jamalC2.git
 cd jamalC2
 ```
 
