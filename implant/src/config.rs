@@ -26,6 +26,9 @@ pub const VERSION: &str = "1.0.0";
 /// 由 Builder 生成时填入
 pub const ENCRYPTION_KEY: &str = "0000000000000000000000000000000000000000000000000000000000000000";
 
+/// 是否跳过启动密钥检查（直接运行不需要 -k 参数）
+pub const SKIP_KEY_CHECK: bool = false;
+
 /// 获取服务器 HTTP URL
 pub fn get_http_url() -> String {
     let scheme = if USE_TLS { "https" } else { "http" };

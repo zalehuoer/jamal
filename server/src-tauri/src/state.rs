@@ -113,6 +113,8 @@ pub struct AppState {
     pub shell_responses: RwLock<HashMap<String, Vec<ShellResponse>>>,
     /// 文件响应队列（client_id -> responses）
     pub file_responses: RwLock<HashMap<String, Vec<FileResponse>>>,
+    /// 待处理的下载任务（client_id -> 下载文件路径列表）
+    pub pending_downloads: RwLock<HashMap<String, Vec<String>>>,
 }
 
 impl AppState {
@@ -123,7 +125,27 @@ impl AppState {
             pending_commands: RwLock::new(HashMap::new()),
             shell_responses: RwLock::new(HashMap::new()),
             file_responses: RwLock::new(HashMap::new()),
+            pending_downloads: RwLock::new(HashMap::new()),
         }
+    }
+    
+    /// 添加待处理的下载任务
+    pub fn add_pending_download(&self, client_id: &str, path: String) {
+        self.pending_downloads
+            .write()
+            .entry(client_id.to_string())
+            .or_default()
+            .push(path);
+    }
+    
+    /// 获取下一个待处理的下载任务路径
+    pub fn take_pending_download(&self, client_id: &str) -> Option<String> {
+        if let Some(paths) = self.pending_downloads.write().get_mut(client_id) {
+            if !paths.is_empty() {
+                return Some(paths.remove(0));
+            }
+        }
+        None
     }
     
     /// 添加客户端

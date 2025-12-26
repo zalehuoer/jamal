@@ -21,9 +21,40 @@ pub struct ClientInfo {
     pub beacon_interval: u64,
 }
 
-/// 获取所有连接的客户端
+/// 获取所有连接的客户端（自动清理超时的客户端）
 #[tauri::command]
 pub fn get_clients(state: State<SharedState>) -> Vec<ClientInfo> {
+    use chrono::Utc;
+    
+    let now = Utc::now();
+    
+    // 首先收集超时的客户端 ID
+    let timeout_ids: Vec<String> = state.clients.read()
+        .iter()
+        .filter_map(|(id, c)| {
+            // 超时阈值 = max(心跳间隔 * 3 + 30, 120) 秒
+            // 确保最少 120 秒，防止修改间隔后误删
+            let calculated = c.beacon_interval * 3 + 30;
+            let timeout_seconds = std::cmp::max(calculated, 120) as i64;
+            let elapsed = now.signed_duration_since(c.last_seen).num_seconds();
+            if elapsed > timeout_seconds {
+                Some(id.clone())
+            } else {
+                None
+            }
+        })
+        .collect();
+    
+    // 清理超时的客户端
+    if !timeout_ids.is_empty() {
+        let mut clients = state.clients.write();
+        for id in &timeout_ids {
+            clients.remove(id);
+            println!("[*] Client {} timed out and removed", id);
+        }
+    }
+    
+    // 返回剩余的活跃客户端
     state.get_clients()
         .into_iter()
         .map(|c| ClientInfo {
