@@ -290,6 +290,7 @@ function ListenerModal({
   const [name, setName] = useState(existingListener?.name || "HTTP Listener");
   const [bindAddress, setBindAddress] = useState(existingListener?.bind_address || "0.0.0.0");
   const [port, setPort] = useState(existingListener?.port || 4444);
+  const [encryptionKey, setEncryptionKey] = useState("");
   const [loading, setLoading] = useState(false);
 
   // 如果已有监听器，显示查看模式
@@ -301,6 +302,12 @@ function ListenerModal({
       return;
     }
 
+    // 验证密钥格式（如果提供）
+    if (encryptionKey && !/^[0-9a-fA-F]{64}$/.test(encryptionKey)) {
+      alert("加密密钥必须是64位十六进制字符串，或留空自动生成");
+      return;
+    }
+
     setLoading(true);
     try {
       await invoke("create_listener", {
@@ -308,6 +315,7 @@ function ListenerModal({
           name,
           bind_address: bindAddress,
           port,
+          encryption_key: encryptionKey || null,
         },
       });
       // Auto-start the listener
@@ -365,6 +373,19 @@ function ListenerModal({
             disabled={isViewMode}
           />
         </div>
+
+        {!isViewMode && (
+          <div className="form-group">
+            <label className="form-label">加密密钥 (可选，留空自动生成)</label>
+            <input
+              className="form-input"
+              value={encryptionKey}
+              onChange={(e) => setEncryptionKey(e.target.value)}
+              placeholder="64位十六进制字符串，或留空"
+              style={{ fontSize: "12px", fontFamily: "monospace" }}
+            />
+          </div>
+        )}
 
         {isViewMode && (
           <>

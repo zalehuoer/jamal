@@ -48,7 +48,7 @@ cl.exe /O2 /MT /W3 /D_CRT_SECURE_NO_WARNINGS /Fe:build\implant.exe ^
     winhttp.lib ^
     advapi32.lib ^
     user32.lib ^
-    /SUBSYSTEM:CONSOLE
+    /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
 if %errorlevel% equ 0 (
     echo.

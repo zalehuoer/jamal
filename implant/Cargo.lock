@@ -423,6 +423,7 @@ dependencies = [
  "base64",
  "encoding_rs",
  "hostname",
+ "libc",
  "native-tls",
  "rand",
  "serde",

@@ -36,6 +36,8 @@ pub struct CreateListenerRequest {
     pub name: String,
     pub bind_address: String,
     pub port: u16,
+    /// 可选的加密密钥（64位十六进制），留空则自动生成
+    pub encryption_key: Option<String>,
 }
 
 /// 创建监听器
@@ -46,8 +48,13 @@ pub async fn create_listener(
 ) -> Result<ListenerInfo, String> {
     let id = Uuid::new_v4().to_string();
     
-    // 生成加密密钥
-    let encryption_key = shared::crypto::Crypto::generate_key_hex();
+    // 使用用户提供的密钥或生成新密钥
+    let encryption_key = match &request.encryption_key {
+        Some(key) if key.len() == 64 && key.chars().all(|c| c.is_ascii_hexdigit()) => {
+            key.clone()
+        }
+        _ => shared::crypto::Crypto::generate_key_hex(),
+    };
     
     let listener = ListenerConfig {
         id: id.clone(),

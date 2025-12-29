@@ -96,6 +96,6 @@ fn is_elevated() -> bool {
 
 #[cfg(not(windows))]
 fn is_elevated() -> bool {
-    // 简化版：假设非 root
-    false
+    // 检测是否是 root 用户 (UID == 0)
+    unsafe { libc::getuid() == 0 }
 }

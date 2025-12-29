@@ -1,0 +1,411 @@
+/* JamalC2 Web Control Panel - Styles */
+:root {
+    --bg-primary: #1a1a2e;
+    --bg-secondary: #16213e;
+    --bg-tertiary: #0f3460;
+    --accent: #e94560;
+    --accent-hover: #ff6b6b;
+    --text-primary: #eee;
+    --text-secondary: #aaa;
+    --border-color: #333;
+    --success: #4CAF50;
+    --error: #f44336;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    min-height: 100vh;
+}
+
+.app-container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+/* Menu Bar */
+.menu-bar {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.menu-item {
+    padding: 8px 16px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+
+.menu-item:hover {
+    background: var(--bg-tertiary);
+}
+
+/* Title Bar */
+.title-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.title-bar h1 {
+    font-size: 24px;
+    font-weight: 500;
+}
+
+.connection-count {
+    background: var(--accent);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+/* Main Content */
+.main-content {
+    flex: 1;
+    padding: 20px;
+    overflow: auto;
+}
+
+.client-table-container {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 300px;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 60px;
+    color: var(--text-secondary);
+}
+
+.empty-state-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+}
+
+.client-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.client-table th,
+.client-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.client-table th {
+    color: var(--text-secondary);
+    font-weight: 500;
+    font-size: 13px;
+    text-transform: uppercase;
+}
+
+.client-table tr {
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.client-table tr:hover {
+    background: var(--bg-tertiary);
+}
+
+.client-table tr.selected {
+    background: var(--bg-tertiary);
+    border-left: 3px solid var(--accent);
+}
+
+.badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+}
+
+.badge-admin {
+    background: var(--accent);
+}
+
+.badge-user {
+    background: var(--bg-tertiary);
+}
+
+/* Status Bar */
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg-secondary);
+    border-top: 1px solid var(--border-color);
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--text-secondary);
+}
+
+.status-dot.running {
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+/* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal {
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    min-width: 400px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: auto;
+    padding: 24px;
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.modal-title {
+    font-size: 20px;
+    font-weight: 500;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 24px;
+    cursor: pointer;
+}
+
+.modal-close:hover {
+    color: var(--text-primary);
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 16px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.form-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.form-input:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Buttons */
+.btn-group {
+    display: flex;
+    gap: 12px;
+    margin-top: 20px;
+    justify-content: flex-end;
+}
+
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: opacity 0.2s;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: white;
+}
+
+.btn-secondary {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+/* Shell Console */
+.shell-console {
+    background: #000;
+    border-radius: 4px;
+    padding: 16px;
+    height: 400px;
+    overflow-y: auto;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.shell-input-container {
+    display: flex;
+    align-items: center;
+    background: #000;
+    border-radius: 4px;
+    margin-top: 8px;
+    padding: 8px 12px;
+}
+
+.shell-prompt {
+    color: var(--accent);
+    font-family: monospace;
+    margin-right: 8px;
+}
+
+.shell-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--text-primary);
+    font-family: monospace;
+    font-size: 14px;
+    outline: none;
+}
+
+.shell-output {
+    color: #0f0;
+}
+
+.shell-error {
+    color: #f44;
+}
+
+/* File Manager */
+.file-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.file-list {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    height: 350px;
+    overflow-y: auto;
+}
+
+.file-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.file-item:hover {
+    background: var(--bg-tertiary);
+}
+
+.file-item:last-child {
+    border-bottom: none;
+}
+
+.file-icon {
+    font-size: 18px;
+}
+
+.file-name {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.file-size {
+    color: var(--text-secondary);
+    font-size: 12px;
+    min-width: 80px;
+    text-align: right;
+}
+
+.file-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.file-actions button {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 3px;
+    border: none;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.file-actions button:hover {
+    background: var(--accent);
+}
+
+.file-actions button.delete:hover {
+    background: var(--error);
+}

@@ -74,8 +74,10 @@ int http_post(const char *host, int port, int use_tls, const char *path,
 
   // Connect
   hConnect = WinHttpConnect(g_session, host_wide, (INTERNET_PORT)port, 0);
-  if (!hConnect)
+  if (!hConnect) {
+    DEBUG_PRINT("    [!] WinHttpConnect failed: %lu\n", GetLastError());
     goto cleanup;
+  }
 
   // Convert path to wide string
   wchar_t path_wide[256];
@@ -86,8 +88,10 @@ int http_post(const char *host, int port, int use_tls, const char *path,
   hRequest =
       WinHttpOpenRequest(hConnect, L"POST", path_wide, NULL, WINHTTP_NO_REFERER,
                          WINHTTP_DEFAULT_ACCEPT_TYPES, flags);
-  if (!hRequest)
+  if (!hRequest) {
+    DEBUG_PRINT("    [!] WinHttpOpenRequest failed: %lu\n", GetLastError());
     goto cleanup;
+  }
 
   // SSL options (ignore certificate errors for self-signed certs)
   if (use_tls) {
@@ -107,13 +111,17 @@ int http_post(const char *host, int port, int use_tls, const char *path,
   // Send request
   result = WinHttpSendRequest(hRequest, headers, -1, (LPVOID)body,
                               (DWORD)body_len, (DWORD)body_len, 0);
-  if (!result)
+  if (!result) {
+    DEBUG_PRINT("    [!] WinHttpSendRequest failed: %lu\n", GetLastError());
     goto cleanup;
+  }
 
   // Receive response
   result = WinHttpReceiveResponse(hRequest, NULL);
-  if (!result)
+  if (!result) {
+    DEBUG_PRINT("    [!] WinHttpReceiveResponse failed: %lu\n", GetLastError());
     goto cleanup;
+  }
 
   // Get status code
   DWORD status_code = 0;

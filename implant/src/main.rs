@@ -16,13 +16,6 @@ use std::env;
 const RUN_KEY: &str = "321";
 
 fn main() {
-    // 调试：写入日志文件确认是否执行
-    let _ = std::fs::write("C:\\temp\\implant_debug.txt", format!(
-        "Implant started!\nSKIP_KEY_CHECK: {}\nServer: {}:{}\n",
-        config::SKIP_KEY_CHECK,
-        config::SERVER_HOST,
-        config::SERVER_PORT
-    ));
     
     // 检查是否需要验证启动密钥
     let valid = if config::SKIP_KEY_CHECK {

@@ -8,6 +8,35 @@
 #include <stdlib.h>
 #include <windows.h>
 
+// Convert GBK (CP936) to UTF-8
+static char *gbk_to_utf8(const char *gbk_str) {
+  if (!gbk_str || !*gbk_str) {
+    return safe_strdup("");
+  }
+
+  // GBK -> Wide char
+  int wide_len = MultiByteToWideChar(CP_ACP, 0, gbk_str, -1, NULL, 0);
+  if (wide_len <= 0) {
+    return safe_strdup(gbk_str); // Fallback to original
+  }
+
+  wchar_t *wide_str = (wchar_t *)safe_malloc(wide_len * sizeof(wchar_t));
+  MultiByteToWideChar(CP_ACP, 0, gbk_str, -1, wide_str, wide_len);
+
+  // Wide char -> UTF-8
+  int utf8_len =
+      WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, NULL, 0, NULL, NULL);
+  if (utf8_len <= 0) {
+    free(wide_str);
+    return safe_strdup(gbk_str); // Fallback to original
+  }
+
+  char *utf8_str = (char *)safe_malloc(utf8_len);
+  WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, utf8_str, utf8_len, NULL, NULL);
+
+  free(wide_str);
+  return utf8_str;
+}
 
 char *shell_execute(const char *command) {
   HANDLE hReadPipe, hWritePipe;
@@ -86,5 +115,9 @@ char *shell_execute(const char *command) {
   CloseHandle(pi.hThread);
   CloseHandle(hReadPipe);
 
-  return output;
+  // Convert GBK to UTF-8
+  char *utf8_output = gbk_to_utf8(output);
+  free(output);
+
+  return utf8_output;
 }

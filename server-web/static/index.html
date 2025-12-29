@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JamalC2 Control Panel</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Menu Bar -->
+        <div class="menu-bar">
+            <div class="menu-item" onclick="showListenerModal()">设置</div>
+            <div class="menu-item" onclick="showBuilderModal()">生成</div>
+            <div class="menu-item" id="menuFile" style="display:none" onclick="showFileModal()">文件</div>
+            <div class="menu-item" id="menuBeacon" style="display:none" onclick="setBeaconInterval()">心跳间隔</div>
+            <div class="menu-item" id="menuDisconnect" style="display:none; margin-left:auto; color:#f44336"
+                onclick="disconnectClient()">断开连接</div>
+        </div>
+
+        <!-- Title Bar -->
+        <div class="title-bar">
+            <h1>🐱 JamalC2</h1>
+            <span class="connection-count">已连接: <span id="clientCount">0</span></span>
+        </div>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <div class="client-table-container">
+                <div id="emptyState" class="empty-state">
+                    <div class="empty-state-icon">📡</div>
+                    <div>暂无客户端连接</div>
+                    <div style="font-size: 12px">请先创建监听器</div>
+                </div>
+                <table id="clientTable" class="client-table" style="display:none">
+                    <thead>
+                        <tr>
+                            <th>IP地址</th>
+                            <th>标签</th>
+                            <th>用户@PC</th>
+                            <th>心跳间隔</th>
+                            <th>状态</th>
+                            <th>国家</th>
+                            <th>操作系统</th>
+                            <th>帐户类型</th>
+                        </tr>
+                    </thead>
+                    <tbody id="clientTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-indicator">
+                <span id="statusDot" class="status-dot"></span>
+                <span>监听器: <span id="listenerStatus">关闭</span></span>
+            </div>
+            <div id="listenerInfo"></div>
+        </div>
+    </div>
+
+    <!-- Listener Modal -->
+    <div id="listenerModal" class="modal-overlay" style="display:none">
+        <div class="modal" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <h2 class="modal-title" id="listenerModalTitle">创建监听器</h2>
+                <button class="modal-close" onclick="hideListenerModal()">×</button>
+            </div>
+            <div class="form-group">
+                <label class="form-label">名称</label>
+                <input id="listenerName" class="form-input" value="HTTP Listener">
+            </div>
+            <div class="form-group">
+                <label class="form-label">绑定地址</label>
+                <input id="listenerBind" class="form-input" value="0.0.0.0">
+            </div>
+            <div class="form-group">
+                <label class="form-label">端口</label>
+                <input id="listenerPort" class="form-input" type="number" value="4444">
+            </div>
+            <div class="form-group" id="keyInputGroup">
+                <label class="form-label">加密密钥 (从 Windows 端复制，64位十六进制)</label>
+                <input id="listenerKey" class="form-input" placeholder="留空则自动生成"
+                    style="font-family:monospace;font-size:12px">
+            </div>
+            <div id="listenerExtraInfo"></div>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="hideListenerModal()">关闭</button>
+                <button id="listenerSubmitBtn" class="btn btn-primary" onclick="createListener()">创建并启动</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shell Modal -->
+    <div id="shellModal" class="modal-overlay" style="display:none">
+        <div class="modal" onclick="event.stopPropagation()" style="min-width:800px">
+            <div class="modal-header">
+                <h2 class="modal-title">远程 Shell - <span id="shellClientId"></span></h2>
+                <button class="modal-close" onclick="hideShellModal()">×</button>
+            </div>
+            <div id="shellConsole" class="shell-console"></div>
+            <form onsubmit="sendShellCommand(event)" class="shell-input-container">
+                <span class="shell-prompt">&gt;</span>
+                <input id="shellInput" class="shell-input" placeholder="输入命令..." autofocus>
+            </form>
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="clearShell()">清空</button>
+                <button class="btn btn-secondary" onclick="hideShellModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- File Manager Modal -->
+    <div id="fileModal" class="modal-overlay" style="display:none">
+        <div class="modal" onclick="event.stopPropagation()" style="min-width:800px">
+            <div class="modal-header">
+                <h2 class="modal-title">文件管理 - <span id="fileClientId"></span></h2>
+                <button class="modal-close" onclick="hideFileModal()">×</button>
+            </div>
+            <div class="file-toolbar">
+                <input id="filePath" class="form-input" value="" placeholder="留空显示驱动器列表" style="flex:1">
+                <button class="btn btn-primary" onclick="loadDirectory()">浏览</button>
+                <button class="btn btn-secondary" onclick="loadDirectory()">刷新</button>
+                <button class="btn btn-secondary" onclick="goUpDirectory()">上级</button>
+                <button class="btn btn-secondary" onclick="goToRoot()">根目录</button>
+            </div>
+            <div id="fileList" class="file-list">
+                <div class="empty-state" style="padding:30px">点击"浏览"加载目录</div>
+            </div>
+            <div class="btn-group">
+                <input type="file" id="uploadFileInput" style="display:none" onchange="handleUpload()">
+                <button class="btn btn-secondary"
+                    onclick="document.getElementById('uploadFileInput').click()">上传文件</button>
+                <button class="btn btn-secondary" onclick="hideFileModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Builder Modal -->
+    <div id="builderModal" class="modal-overlay" style="display:none">
+        <div class="modal" onclick="event.stopPropagation()" style="min-width:500px">
+            <div class="modal-header">
+                <h2 class="modal-title">生成 Linux Implant</h2>
+                <button class="modal-close" onclick="hideBuilderModal()">×</button>
+            </div>
+            <form onsubmit="buildImplant(event)">
+                <div class="form-group">
+                    <label class="form-label">服务器地址</label>
+                    <input id="builderHost" class="form-input" placeholder="例：192.168.1.100 或 example.com" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">服务器端口</label>
+                    <input id="builderPort" type="number" class="form-input" value="8443" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">使用 HTTPS</label>
+                    <select id="builderTls" class="form-input">
+                        <option value="false">否 (HTTP)</option>
+                        <option value="true">是 (HTTPS)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">加密密钥 (从监听器获取)</label>
+                    <input id="builderKey" class="form-input" placeholder="64位十六进制密钥" required
+                        style="font-family:monospace">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">标签</label>
+                    <input id="builderTag" class="form-input" value="default">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">输出文件名 (不含扩展名)</label>
+                    <input id="builderOutput" class="form-input" value="implant_linux" required>
+                </div>
+                <div id="builderStatus"
+                    style="margin: 10px 0; padding: 10px; background: #1a1a2e; border-radius: 4px; display: none;">
+                </div>
+                <div class="btn-group">
+                    <button type="submit" id="builderSubmitBtn" class="btn btn-primary">开始编译</button>
+                    <button type="button" class="btn btn-secondary" onclick="hideBuilderModal()">取消</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
