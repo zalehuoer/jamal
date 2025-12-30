@@ -5,6 +5,7 @@ mod state;
 mod listener;
 mod api;
 mod auth;
+mod db;
 
 use std::sync::Arc;
 use std::net::SocketAddr;

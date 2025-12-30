@@ -96,15 +96,18 @@ pub async fn disconnect_client(
     client_id: String,
 ) -> Result<(), String> {
     // 发送 Exit 命令让客户端真正退出
-    // 注意：不要立即调用 remove_client，否则会清除 pending_commands
-    // Implant 下次轮询时会收到 Exit 命令并退出
     let msg = Message::Exit;
     if let Ok(data) = msg.serialize() {
         crate::listener::send_to_client(&state, &client_id, &data);
         println!("[*] Exit command sent to client: {}", client_id);
     }
     
-    // 只从客户端列表移除，保留 pending_commands 让 Implant 能收到 Exit
+    // 从数据库删除（防止重启后出现幽灵客户端）
+    if let Some(ref db) = state.db {
+        let _ = db.delete_client(&client_id);
+    }
+    
+    // 从内存中的客户端列表移除，但保留 pending_commands 让 Implant 能收到 Exit
     state.clients.write().remove(&client_id);
     
     Ok(())
