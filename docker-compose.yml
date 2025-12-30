@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  jamalc2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: jamalc2-server
+    restart: unless-stopped
+    ports:
+      - "4444:4444"
+    volumes:
+      - jamalc2_data:/app/data
+    environment:
+      - JAMAL_PORT=4444
+      - RUST_LOG=info
+
+volumes:
+  jamalc2_data:

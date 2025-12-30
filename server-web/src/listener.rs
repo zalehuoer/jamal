@@ -92,9 +92,6 @@ pub async fn handle_c2(
     headers: axum::http::HeaderMap,
     body: axum::body::Bytes,
 ) -> impl IntoResponse {
-    // Debug: print raw body
-    println!("[DEBUG] Received body ({} bytes): {}", body.len(), 
-             String::from_utf8_lossy(&body[..std::cmp::min(500, body.len())]));
     
     // Parse JSON manually
     let encrypted_req: EncryptedRequest = match serde_json::from_slice(&body) {
@@ -136,9 +133,6 @@ pub async fn handle_c2(
             return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "Decryption failed" })));
         }
     };
-    
-    // Debug: print decrypted content
-    println!("[DEBUG] Decrypted content: {}", String::from_utf8_lossy(&decrypted));
     
     // 解析请求
     let request: C2Request = match serde_json::from_slice(&decrypted) {

