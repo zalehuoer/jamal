@@ -25,8 +25,20 @@ fn decode_output(bytes: &[u8]) -> String {
 
 /// 检查命令是否是后台运行命令
 fn is_background_command(command: &str) -> bool {
-    let cmd_lower = command.to_lowercase().trim_start().to_string();
-    cmd_lower.starts_with("start ") || cmd_lower.starts_with("start/")
+    let cmd_trimmed = command.trim();
+    let cmd_lower = cmd_trimmed.to_lowercase();
+    
+    // Windows: start command
+    if cmd_lower.starts_with("start ") || cmd_lower.starts_with("start/") {
+        return true;
+    }
+    
+    // Linux: nohup or ending with &
+    if cmd_lower.starts_with("nohup ") || cmd_trimmed.ends_with(" &") || cmd_trimmed.ends_with("&") {
+        return true;
+    }
+    
+    false
 }
 
 /// 执行 Shell 命令（同步，带超时）

