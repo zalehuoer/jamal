@@ -4,6 +4,7 @@
 mod state;
 mod listener;
 mod commands;
+mod db;
 
 use state::{AppState, SharedState};
 use std::sync::Arc;

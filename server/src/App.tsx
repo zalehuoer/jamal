@@ -416,6 +416,40 @@ function ListenerModal({
           <button className="btn btn-secondary" onClick={onClose}>
             {isViewMode ? "关闭" : "取消"}
           </button>
+          {isViewMode && !existingListener.is_running && (
+            <button
+              className="btn"
+              style={{ background: "#22c55e", color: "white" }}
+              onClick={async () => {
+                try {
+                  await invoke("start_listener", { listenerId: existingListener.id });
+                  onCreated();  // 刷新列表
+                  onClose();
+                } catch (error) {
+                  alert("启动失败: " + error);
+                }
+              }}
+            >
+              启动监听器
+            </button>
+          )}
+          {isViewMode && existingListener.is_running && (
+            <button
+              className="btn"
+              style={{ background: "#f59e0b", color: "white" }}
+              onClick={async () => {
+                try {
+                  await invoke("stop_listener", { listenerId: existingListener.id });
+                  onCreated();  // 刷新列表
+                  onClose();
+                } catch (error) {
+                  alert("停止失败: " + error);
+                }
+              }}
+            >
+              停止监听器
+            </button>
+          )}
           {isViewMode && (
             <button
               className="btn"

@@ -157,7 +157,12 @@ async fn disconnect_client(
         send_to_client(&state, &client_id, &data);
     }
     
-    // 从列表移除
+    // 从数据库删除（防止重启后出现幽灵客户端）
+    if let Some(ref db) = state.db {
+        let _ = db.delete_client(&client_id);
+    }
+    
+    // 从内存列表移除，但保留 pending_commands 让 Implant 能收到 Exit
     state.clients.write().remove(&client_id);
     
     StatusCode::OK
@@ -280,7 +285,7 @@ async fn delete_listener(
     State(state): State<SharedState>,
     Path(listener_id): Path<String>,
 ) -> impl IntoResponse {
-    state.listeners.write().remove(&listener_id);
+    state.delete_listener(&listener_id);
     StatusCode::OK
 }
 
@@ -357,9 +362,7 @@ async fn start_listener(
     state.listener_shutdown.write().insert(listener_id.clone(), shutdown_tx);
     
     // 更新状态
-    if let Some(listener) = state.listeners.write().get_mut(&listener_id) {
-        listener.is_running = true;
-    }
+    state.update_listener_status(&listener_id, true);
     
     println!("[*] Listener {} started on {}", listener_id, bind_addr);
     StatusCode::OK
@@ -376,12 +379,8 @@ async fn stop_listener(
     }
     
     // 更新状态
-    if let Some(listener) = state.listeners.write().get_mut(&listener_id) {
-        listener.is_running = false;
-        StatusCode::OK
-    } else {
-        StatusCode::NOT_FOUND
-    }
+    state.update_listener_status(&listener_id, false);
+    StatusCode::OK
 }
 
 // ============== 文件管理 API ==============

@@ -30,5 +30,8 @@ dirs = "5"
 rand = "0.8"
 tokio-util = { version = "0.7", features = ["io"] }
 
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+
 # Shared library
 shared = { path = "../shared" }
