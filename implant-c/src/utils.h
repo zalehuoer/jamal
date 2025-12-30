@@ -8,13 +8,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
-// Debug print macro - disabled in release builds
-#ifdef NDEBUG
-#define DEBUG_PRINT(fmt, ...) ((void)0)
-#else
-#include <stdio.h>
-#define DEBUG_PRINT(fmt, ...) printf(fmt, ##__VA_ARGS__)
-#endif
+// Debug print macro defined in config.h
+#include "config.h"
 
 // Base64 encode
 // Caller must free the returned string
