@@ -128,7 +128,7 @@ npm install
 
 ## 🐧 Linux 服务端部署（Docker）
 
-适用于部署到 Linux VPS/云服务器的无头环境。
+适用于部署到 Linux VPS/云服务器，通过浏览器访问 Web 管理界面。
 
 ### 方式一：一键部署
 
