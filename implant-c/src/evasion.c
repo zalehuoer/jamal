@@ -4,12 +4,10 @@
  */
 
 #include "evasion.h"
-#include "config.h"
 #include <shlobj.h>
 #include <stdio.h>
 #include <string.h>
 #include <tlhelp32.h>
-
 
 // === 辅助函数 ===
 
