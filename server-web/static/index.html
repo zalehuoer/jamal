@@ -143,10 +143,17 @@
     <div id="builderModal" class="modal-overlay" style="display:none">
         <div class="modal" onclick="event.stopPropagation()" style="min-width:500px">
             <div class="modal-header">
-                <h2 class="modal-title">生成 Linux Implant</h2>
+                <h2 class="modal-title" id="builderModalTitle">生成 Implant</h2>
                 <button class="modal-close" onclick="hideBuilderModal()">×</button>
             </div>
             <form onsubmit="buildImplant(event)">
+                <div class="form-group">
+                    <label class="form-label">Implant 类型</label>
+                    <select id="builderType" class="form-input" onchange="updateBuilderUI()">
+                        <option value="rust">Rust (Linux 目标)</option>
+                        <option value="c">C (Windows 目标)</option>
+                    </select>
+                </div>
                 <div class="form-group">
                     <label class="form-label">服务器地址</label>
                     <input id="builderHost" class="form-input" placeholder="例：192.168.1.100 或 example.com" required>
@@ -173,7 +180,8 @@
                 </div>
                 <div class="form-group">
                     <label class="form-label">输出文件名 (不含扩展名)</label>
-                    <input id="builderOutput" class="form-input" value="implant_linux" required>
+                    <input id="builderOutput" class="form-input" value="implant" required>
+                    <small id="builderOutputHint" style="color:#888;font-size:12px">生成文件: implant (Linux ELF)</small>
                 </div>
                 <div id="builderStatus"
                     style="margin: 10px 0; padding: 10px; background: #1a1a2e; border-radius: 4px; display: none;">

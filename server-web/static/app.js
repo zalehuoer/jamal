@@ -646,6 +646,29 @@ function showBuilderModal() {
         document.getElementById('builderKey').value = listeners[0].encryption_key;
         document.getElementById('builderPort').value = listeners[0].port;
     }
+    
+    // 更新 UI 状态
+    updateBuilderUI();
+}
+
+function updateBuilderUI() {
+    const type = document.getElementById('builderType').value;
+    const title = document.getElementById('builderModalTitle');
+    const hint = document.getElementById('builderOutputHint');
+    const output = document.getElementById('builderOutput');
+    
+    if (type === 'c') {
+        title.textContent = '生成 Windows C Implant';
+        hint.textContent = '生成文件: ' + output.value + '.exe (Windows PE)';
+    } else {
+        title.textContent = '生成 Linux Rust Implant';
+        hint.textContent = '生成文件: ' + output.value + ' (Linux ELF)';
+    }
+}
+
+// 监听输入框变化更新提示
+if (document.getElementById('builderOutput')) {
+    document.getElementById('builderOutput').addEventListener('input', updateBuilderUI);
 }
 
 function hideBuilderModal() {
@@ -663,13 +686,16 @@ async function buildImplant(event) {
     statusDiv.style.color = '#aaa';
     submitBtn.disabled = true;
 
+    const implantType = document.getElementById('builderType').value;
+    
     const request = {
         server_host: document.getElementById('builderHost').value.trim(),
         server_port: parseInt(document.getElementById('builderPort').value),
         use_tls: document.getElementById('builderTls').value === 'true',
         encryption_key: document.getElementById('builderKey').value.trim(),
         tag: document.getElementById('builderTag').value.trim() || 'default',
-        output_name: document.getElementById('builderOutput').value.trim() || 'implant_linux',
+        output_name: document.getElementById('builderOutput').value.trim() || 'implant',
+        implant_type: implantType,
     };
 
     // 验证密钥格式
