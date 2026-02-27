@@ -517,7 +517,7 @@ mod tests {
             id: "l1".to_string(),
             name: "Test Listener".to_string(),
             bind_address: "0.0.0.0".to_string(),
-            port: 4444,
+            port: 80,
             is_running: false,
             encryption_key: "a".repeat(64),
         };
@@ -545,7 +545,7 @@ mod tests {
             id: "l1".to_string(),
             name: "L1".to_string(),
             bind_address: "0.0.0.0".to_string(),
-            port: 4444,
+            port: 80,
             is_running: false,
             encryption_key: "key_stopped".to_string(),
         });

@@ -1155,7 +1155,7 @@ mod tests {
     fn test_generate_c_config_contains_values() {
         let req = BuildRequest {
             server_host: "192.168.1.100".to_string(),
-            server_port: 4444,
+            server_port: 80,
             use_tls: false,
             tag: "c-implant".to_string(),
             output_name: "test.exe".to_string(),
@@ -1165,7 +1165,7 @@ mod tests {
         let config = generate_c_config(&req);
         
         assert!(config.contains("192.168.1.100"));
-        assert!(config.contains("4444"));
+        assert!(config.contains("80"));
         assert!(config.contains("USE_TLS 0"));
         assert!(config.contains("c-implant"));
     }
@@ -1174,7 +1174,7 @@ mod tests {
     fn test_generate_config_with_malicious_input() {
         let req = BuildRequest {
             server_host: r#""; system("rm -rf /"); //"#.to_string(),
-            server_port: 4444,
+            server_port: 80,
             use_tls: false,
             tag: "normal".to_string(),
             output_name: "test".to_string(),

@@ -38,8 +38,12 @@ async fn main() {
             .allow_headers(Any))
         .with_state(state.clone());
     
-    // Web 控制面板端口
-    let web_addr = SocketAddr::from(([0, 0, 0, 0], 8889));
+    // Web 控制面板端口（支持环境变量覆盖）
+    let web_port: u16 = std::env::var("JAMAL_WEB_PORT")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(443);
+    let web_addr = SocketAddr::from(([0, 0, 0, 0], web_port));
     
     println!("[*] Web UI listening on http://{}", web_addr);
     println!("[*] Auth: admin/jamal123 (or set JAMAL_USERNAME/JAMAL_PASSWORD env vars)");

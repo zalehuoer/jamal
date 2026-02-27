@@ -8,11 +8,12 @@ services:
     container_name: jamalc2-server
     restart: unless-stopped
     ports:
-      - "4444:4444"
+      - "443:443"
+      - "80:80"
     volumes:
       - jamalc2_data:/app/data
     environment:
-      - JAMAL_PORT=4444
+      - JAMAL_WEB_PORT=443
       - RUST_LOG=info
 
 volumes:

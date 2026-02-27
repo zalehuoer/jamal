@@ -8,7 +8,7 @@
 
 // Server Configuration
 #define SERVER_HOST "192.168.70.128"
-#define SERVER_PORT 4444
+#define SERVER_PORT 80
 #define USE_TLS 0
 
 // Client Configuration

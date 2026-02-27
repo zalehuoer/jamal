@@ -5,7 +5,7 @@
 pub const SERVER_HOST: &str = "127.0.0.1";
 
 /// 服务器端口
-pub const SERVER_PORT: u16 = 4444;
+pub const SERVER_PORT: u16 = 80;
 
 /// 使用 HTTPS
 pub const USE_TLS: bool = false;

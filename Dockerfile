@@ -50,11 +50,11 @@ COPY --from=builder /app/shared /app/shared
 RUN mkdir -p /app/data
 
 # 环境变量
-ENV JAMAL_PORT=4444
+ENV JAMAL_WEB_PORT=443
 ENV JAMAL_DATA_DIR=/app/data
 
-# 暴露端口
-EXPOSE 4444
+# 暴露端口 (Web UI + 默认 C2 Listener)
+EXPOSE 443 80
 
 # 启动
 CMD ["./jamalc2-web"]

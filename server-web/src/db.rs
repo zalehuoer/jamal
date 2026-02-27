@@ -327,7 +327,7 @@ mod tests {
             id: "l1".to_string(),
             name: "Test".to_string(),
             bind_address: "0.0.0.0".to_string(),
-            port: 4444,
+            port: 80,
             encryption_key: "abc123".to_string(),
             is_running: false,
             created_at: "2025-01-01T00:00:00Z".to_string(),
@@ -337,7 +337,7 @@ mod tests {
         let all = db.get_all_listeners().unwrap();
         assert_eq!(all.len(), 1);
         assert_eq!(all[0].name, "Test");
-        assert_eq!(all[0].port, 4444);
+        assert_eq!(all[0].port, 80);
         
         // 更新状态
         db.update_listener_status("l1", true).unwrap();
@@ -445,7 +445,7 @@ mod tests {
     fn test_operation_log() {
         let db = make_temp_db();
         db.log_operation(Some("c1"), "shell", "executed whoami", true).unwrap();
-        db.log_operation(None, "listener", "started on :4444", true).unwrap();
+        db.log_operation(None, "listener", "started on :80", true).unwrap();
         // 不 panic 即通过
     }
 }
