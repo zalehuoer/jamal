@@ -163,9 +163,51 @@ static char *json_escape_string(const char *input) {
   return output;
 }
 
+// 将 UTF-8 字符串转换为 Wide Char (UTF-16)
+static wchar_t *utf8_to_wide(const char *utf8_str) {
+  if (!utf8_str || !utf8_str[0]) {
+    wchar_t *empty = safe_malloc(sizeof(wchar_t));
+    empty[0] = L'\0';
+    return empty;
+  }
+
+  int wide_len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);
+  if (wide_len == 0) {
+    // UTF-8 解码失败，尝试按 ANSI 解码
+    wide_len = MultiByteToWideChar(CP_ACP, 0, utf8_str, -1, NULL, 0);
+    if (wide_len == 0) {
+      wchar_t *empty = safe_malloc(sizeof(wchar_t));
+      empty[0] = L'\0';
+      return empty;
+    }
+    wchar_t *wide_str = safe_malloc(wide_len * sizeof(wchar_t));
+    MultiByteToWideChar(CP_ACP, 0, utf8_str, -1, wide_str, wide_len);
+    return wide_str;
+  }
+
+  wchar_t *wide_str = safe_malloc(wide_len * sizeof(wchar_t));
+  MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, wide_str, wide_len);
+  return wide_str;
+}
+
+// 将 Wide Char (UTF-16) 转换为 UTF-8
+static char *wide_to_utf8(const wchar_t *wide_str) {
+  if (!wide_str || !wide_str[0]) {
+    return safe_strdup("");
+  }
+
+  int utf8_len =
+      WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, NULL, 0, NULL, NULL);
+  if (utf8_len == 0) {
+    return safe_strdup("");
+  }
+
+  char *utf8_str = safe_malloc(utf8_len);
+  WideCharToMultiByte(CP_UTF8, 0, wide_str, -1, utf8_str, utf8_len, NULL, NULL);
+  return utf8_str;
+}
+
 char *files_list_dir(const char *path) {
-  WIN32_FIND_DATAA fd;
-  char search_path[MAX_PATH];
   char *result = NULL;
   size_t result_size = 0;
   size_t result_used = 0;
@@ -182,7 +224,6 @@ char *files_list_dir(const char *path) {
     for (char letter = 'A'; letter <= 'Z'; letter++) {
       if (drives & (1 << (letter - 'A'))) {
         char entry[256];
-        // 添加 path 字段，驱动器的 path 就是 "X:\"
         snprintf(entry, sizeof(entry),
                  "%s{\"name\":\"%c:\\\\\",\"path\":\"%c:\\\\\",\"is_dir\":true,"
                  "\"size\":0}",
@@ -205,9 +246,22 @@ char *files_list_dir(const char *path) {
     return result;
   }
 
-  snprintf(search_path, sizeof(search_path), "%s\\*", path);
+  // 将 UTF-8 路径转为 Wide 字符后拼接通配符
+  wchar_t *wide_path = utf8_to_wide(path);
+  size_t wp_len = wcslen(wide_path);
+  wchar_t *search_path = safe_malloc((wp_len + 3) * sizeof(wchar_t));
+  wcscpy(search_path, wide_path);
+  if (wp_len > 0 && wide_path[wp_len - 1] != L'\\') {
+    wcscat(search_path, L"\\*");
+  } else {
+    wcscat(search_path, L"*");
+  }
 
-  HANDLE hFind = FindFirstFileA(search_path, &fd);
+  WIN32_FIND_DATAW fd;
+  HANDLE hFind = FindFirstFileW(search_path, &fd);
+  free(search_path);
+  free(wide_path);
+
   if (hFind == INVALID_HANDLE_VALUE) {
     return safe_strdup("[]");
   }
@@ -218,20 +272,22 @@ char *files_list_dir(const char *path) {
 
   int first = 1;
   do {
-    if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) {
+    if (wcscmp(fd.cFileName, L".") == 0 || wcscmp(fd.cFileName, L"..") == 0) {
       continue;
     }
 
-    // 将文件名从 ANSI 转换为 UTF-8
-    char *utf8_name = ansi_to_utf8(fd.cFileName);
+    // 将文件名从 Wide Char 直接转为 UTF-8
+    char *utf8_name = wide_to_utf8(fd.cFileName);
 
-    // 构建完整路径
-    char full_path[MAX_PATH * 2];
+    // 构建完整 UTF-8 路径
     size_t path_len = strlen(path);
+    size_t name_len = strlen(utf8_name);
+    size_t full_len = path_len + 1 + name_len + 1;
+    char *full_path = safe_malloc(full_len);
     if (path_len > 0 && path[path_len - 1] == '\\') {
-      snprintf(full_path, sizeof(full_path), "%s%s", path, utf8_name);
+      snprintf(full_path, full_len, "%s%s", path, utf8_name);
     } else {
-      snprintf(full_path, sizeof(full_path), "%s\\%s", path, utf8_name);
+      snprintf(full_path, full_len, "%s\\%s", path, utf8_name);
     }
 
     // 对 name 和 path 统一做 JSON 转义
@@ -250,6 +306,7 @@ char *files_list_dir(const char *path) {
              is_dir ? "true" : "false", file_size.QuadPart);
 
     free(utf8_name);
+    free(full_path);
     free(escaped_name);
     free(escaped_path);
 
@@ -263,7 +320,7 @@ char *files_list_dir(const char *path) {
     result_used += entry_len;
     first = 0;
 
-  } while (FindNextFileA(hFind, &fd));
+  } while (FindNextFileW(hFind, &fd));
 
   FindClose(hFind);
 
