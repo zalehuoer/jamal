@@ -696,6 +696,7 @@ async function buildImplant(event) {
         tag: document.getElementById('builderTag').value.trim() || 'default',
         output_name: document.getElementById('builderOutput').value.trim() || 'implant',
         implant_type: implantType,
+        skip_key_check: document.getElementById('builderSkipKey').checked,
     };
 
     // 验证密钥格式

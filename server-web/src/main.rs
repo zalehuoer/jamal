@@ -42,7 +42,7 @@ async fn main() {
     let web_port: u16 = std::env::var("JAMAL_WEB_PORT")
         .ok()
         .and_then(|s| s.parse().ok())
-        .unwrap_or(443);
+        .unwrap_or(8443);
     let web_addr = SocketAddr::from(([0, 0, 0, 0], web_port));
     
     println!("[*] Web UI listening on http://{}", web_addr);
