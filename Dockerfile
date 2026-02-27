@@ -29,9 +29,11 @@ FROM rust:1.85-slim-bookworm
 
 WORKDIR /app
 
-# 安装运行时依赖 (MinGW-w64 用于交叉编译 C Implant)
+# 安装运行时依赖 (MinGW-w64 编译 C Implant, pkg-config+libssl-dev 编译 Rust Implant)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    pkg-config \
+    libssl-dev \
     mingw-w64 \
     && rm -rf /var/lib/apt/lists/*
 
