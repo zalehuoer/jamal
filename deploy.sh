@@ -48,7 +48,10 @@ if [ "$USE_CN_MIRROR" = true ] && [ ! -f /etc/docker/daemon.json ]; then
     mkdir -p /etc/docker
     cat > /etc/docker/daemon.json <<EOF
 {
-  "registry-mirrors": ["https://mirror.ccs.tencentyun.com"]
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ]
 }
 EOF
     systemctl restart docker

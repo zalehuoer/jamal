@@ -2,7 +2,7 @@
 # 多阶段构建 - 最终镜像约 30MB
 
 # 阶段1: 构建
-FROM rust:1.75-slim-bookworm AS builder
+FROM rust:1.85-slim-bookworm AS builder
 
 WORKDIR /app
 
