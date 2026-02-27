@@ -152,3 +152,46 @@ fn execute_command_inner(command: &str) -> ShellExecuteResponse {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_background_command_windows() {
+        assert!(is_background_command("start notepad"));
+        assert!(is_background_command("START calc.exe"));
+        assert!(is_background_command("start/min cmd"));
+    }
+
+    #[test]
+    fn test_is_background_command_linux() {
+        assert!(is_background_command("nohup ./server &"));
+        assert!(is_background_command("sleep 10 &"));
+        assert!(is_background_command("./run.sh&"));
+    }
+
+    #[test]
+    fn test_is_not_background_command() {
+        assert!(!is_background_command("echo hello"));
+        assert!(!is_background_command("dir"));
+        assert!(!is_background_command("whoami"));
+        assert!(!is_background_command("starting up"));  // "start" 不在开头
+    }
+
+    #[test]
+    fn test_execute_echo() {
+        let cmd = ShellExecute { command: "echo hello_test_123".to_string() };
+        let result = execute_shell_sync(&cmd);
+        assert!(!result.is_error);
+        assert!(result.output.contains("hello_test_123"));
+    }
+
+    #[test]
+    fn test_execute_invalid_command() {
+        let cmd = ShellExecute { command: "this_command_surely_does_not_exist_xyz_123".to_string() };
+        let result = execute_shell_sync(&cmd);
+        // 命令不存在应该报错
+        assert!(result.is_error || result.output.contains("not") || result.output.contains("Error"));
+    }
+}

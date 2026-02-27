@@ -109,6 +109,60 @@ int64_t files_size(const char *path) {
   return size.QuadPart;
 }
 
+// JSON 字符串转义：转义反斜杠、引号和控制字符
+static char *json_escape_string(const char *input) {
+  if (!input)
+    return safe_strdup("");
+
+  // 最坏情况每个字符需要 6 字节（\uXXXX）
+  size_t max_len = strlen(input) * 6 + 1;
+  char *output = safe_malloc(max_len);
+  char *dst = output;
+
+  for (const char *src = input; *src; src++) {
+    switch ((unsigned char)*src) {
+    case '\\':
+      *dst++ = '\\';
+      *dst++ = '\\';
+      break;
+    case '"':
+      *dst++ = '\\';
+      *dst++ = '"';
+      break;
+    case '\n':
+      *dst++ = '\\';
+      *dst++ = 'n';
+      break;
+    case '\r':
+      *dst++ = '\\';
+      *dst++ = 'r';
+      break;
+    case '\t':
+      *dst++ = '\\';
+      *dst++ = 't';
+      break;
+    case '\b':
+      *dst++ = '\\';
+      *dst++ = 'b';
+      break;
+    case '\f':
+      *dst++ = '\\';
+      *dst++ = 'f';
+      break;
+    default:
+      if ((unsigned char)*src < 0x20) {
+        // 控制字符用 \u00XX 表示
+        dst += sprintf(dst, "\\u%04x", (unsigned char)*src);
+      } else {
+        *dst++ = *src;
+      }
+      break;
+    }
+  }
+  *dst = '\0';
+  return output;
+}
+
 char *files_list_dir(const char *path) {
   WIN32_FIND_DATAA fd;
   char search_path[MAX_PATH];
@@ -173,7 +227,6 @@ char *files_list_dir(const char *path) {
 
     // 构建完整路径
     char full_path[MAX_PATH * 2];
-    // 确保路径结尾有反斜杠
     size_t path_len = strlen(path);
     if (path_len > 0 && path[path_len - 1] == '\\') {
       snprintf(full_path, sizeof(full_path), "%s%s", path, utf8_name);
@@ -181,22 +234,11 @@ char *files_list_dir(const char *path) {
       snprintf(full_path, sizeof(full_path), "%s\\%s", path, utf8_name);
     }
 
-    // 对路径中的反斜杠进行 JSON 转义
-    char escaped_path[MAX_PATH * 4];
-    char *src = full_path;
-    char *dst = escaped_path;
-    while (*src && (dst - escaped_path) < sizeof(escaped_path) - 2) {
-      if (*src == '\\') {
-        *dst++ = '\\';
-        *dst++ = '\\';
-      } else {
-        *dst++ = *src;
-      }
-      src++;
-    }
-    *dst = '\0';
+    // 对 name 和 path 统一做 JSON 转义
+    char *escaped_name = json_escape_string(utf8_name);
+    char *escaped_path = json_escape_string(full_path);
 
-    char entry[2048]; // 增大缓冲区以容纳完整路径
+    char entry[4096];
     int is_dir = (fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) ? 1 : 0;
     LARGE_INTEGER file_size;
     file_size.HighPart = fd.nFileSizeHigh;
@@ -204,10 +246,12 @@ char *files_list_dir(const char *path) {
 
     snprintf(entry, sizeof(entry),
              "%s{\"name\":\"%s\",\"path\":\"%s\",\"is_dir\":%s,\"size\":%lld}",
-             first ? "" : ",", utf8_name, escaped_path,
+             first ? "" : ",", escaped_name, escaped_path,
              is_dir ? "true" : "false", file_size.QuadPart);
 
     free(utf8_name);
+    free(escaped_name);
+    free(escaped_path);
 
     size_t entry_len = strlen(entry);
     while (result_used + entry_len + 2 > result_size) {

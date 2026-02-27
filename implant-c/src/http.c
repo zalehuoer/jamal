@@ -93,6 +93,17 @@ int http_post(const char *host, int port, int use_tls, const char *path,
     goto cleanup;
   }
 
+  // 设置超时 (30秒)，防止 HTTP 请求永久阻塞
+  DWORD timeout = 30000;
+  WinHttpSetOption(hRequest, WINHTTP_OPTION_CONNECT_TIMEOUT, &timeout,
+                   sizeof(timeout));
+  WinHttpSetOption(hRequest, WINHTTP_OPTION_SEND_TIMEOUT, &timeout,
+                   sizeof(timeout));
+  WinHttpSetOption(hRequest, WINHTTP_OPTION_RECEIVE_TIMEOUT, &timeout,
+                   sizeof(timeout));
+  WinHttpSetOption(hRequest, WINHTTP_OPTION_RECEIVE_RESPONSE_TIMEOUT, &timeout,
+                   sizeof(timeout));
+
   // SSL options (ignore certificate errors for self-signed certs)
   if (use_tls) {
     DWORD ssl_flags = SECURITY_FLAG_IGNORE_UNKNOWN_CA |

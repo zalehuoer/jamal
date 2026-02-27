@@ -149,4 +149,89 @@ mod tests {
         // 使用错误密钥解密应该失败
         assert!(crypto2.decrypt(&encrypted).is_err());
     }
+    
+    #[test]
+    fn test_encrypt_empty_data() {
+        let key = Crypto::generate_key();
+        let crypto = Crypto::new(&key);
+        
+        let plaintext = b"";
+        let encrypted = crypto.encrypt(plaintext).unwrap();
+        let decrypted = crypto.decrypt(&encrypted).unwrap();
+        
+        assert_eq!(plaintext.as_slice(), decrypted.as_slice());
+    }
+    
+    #[test]
+    fn test_encrypt_large_data() {
+        let key = Crypto::generate_key();
+        let crypto = Crypto::new(&key);
+        
+        let plaintext = vec![0xABu8; 1024 * 64]; // 64KB
+        let encrypted = crypto.encrypt(&plaintext).unwrap();
+        let decrypted = crypto.decrypt(&encrypted).unwrap();
+        
+        assert_eq!(plaintext, decrypted);
+    }
+    
+    #[test]
+    fn test_decrypt_too_short() {
+        let key = Crypto::generate_key();
+        let crypto = Crypto::new(&key);
+        
+        // 数据太短（小于 NONCE_SIZE）
+        assert!(crypto.decrypt(&[0u8; 5]).is_err());
+        assert!(crypto.decrypt(&[]).is_err());
+    }
+    
+    #[test]
+    fn test_decrypt_corrupted() {
+        let key = Crypto::generate_key();
+        let crypto = Crypto::new(&key);
+        
+        let plaintext = b"Test";
+        let mut encrypted = crypto.encrypt(plaintext).unwrap();
+        // 修改密文数据
+        if let Some(last) = encrypted.last_mut() {
+            *last ^= 0xFF;
+        }
+        assert!(crypto.decrypt(&encrypted).is_err());
+    }
+    
+    #[test]
+    fn test_hex_conversion_roundtrip() {
+        let original = vec![0x00, 0x11, 0xAA, 0xFF, 0x5C];
+        let hex = bytes_to_hex(&original);
+        let recovered = hex_to_bytes(&hex).unwrap();
+        assert_eq!(original, recovered);
+    }
+    
+    #[test]
+    fn test_hex_invalid_input() {
+        assert!(hex_to_bytes("GG").is_none());  // 非法 hex 字符
+        assert!(hex_to_bytes("abc").is_none()); // 奇数长度
+        assert_eq!(hex_to_bytes("").unwrap(), Vec::<u8>::new()); // 空字符串
+    }
+    
+    #[test]
+    fn test_from_hex_wrong_length() {
+        // 密钥长度不是 32 字节
+        let short_hex = "00112233";
+        assert!(Crypto::from_hex(short_hex).is_err());
+    }
+    
+    #[test]
+    fn test_each_encryption_is_unique() {
+        let key = Crypto::generate_key();
+        let crypto = Crypto::new(&key);
+        let plaintext = b"Same message";
+        
+        let enc1 = crypto.encrypt(plaintext).unwrap();
+        let enc2 = crypto.encrypt(plaintext).unwrap();
+        
+        // 每次加密结果不同（因为 nonce 随机）
+        assert_ne!(enc1, enc2);
+        // 但解密结果相同
+        assert_eq!(crypto.decrypt(&enc1).unwrap(), crypto.decrypt(&enc2).unwrap());
+    }
 }

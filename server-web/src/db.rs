@@ -305,3 +305,147 @@ pub struct ShellHistoryRecord {
     pub success: bool,
     pub created_at: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_temp_db() -> Database {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.db");
+        let db = Database::new(db_path).unwrap();
+        // 保持 dir 不被 drop（通过 leak 避免临时目录被删）
+        std::mem::forget(dir);
+        db
+    }
+
+    #[test]
+    fn test_listener_crud() {
+        let db = make_temp_db();
+        
+        let record = ListenerRecord {
+            id: "l1".to_string(),
+            name: "Test".to_string(),
+            bind_address: "0.0.0.0".to_string(),
+            port: 4444,
+            encryption_key: "abc123".to_string(),
+            is_running: false,
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        };
+        db.save_listener(&record).unwrap();
+        
+        let all = db.get_all_listeners().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].name, "Test");
+        assert_eq!(all[0].port, 4444);
+        
+        // 更新状态
+        db.update_listener_status("l1", true).unwrap();
+        let all = db.get_all_listeners().unwrap();
+        assert!(all[0].is_running);
+        
+        // 删除
+        db.delete_listener("l1").unwrap();
+        assert!(db.get_all_listeners().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_client_crud() {
+        let db = make_temp_db();
+        
+        let record = ClientRecord {
+            id: "c1".to_string(),
+            ip_address: Some("192.168.1.1".to_string()),
+            hostname: Some("PC-TEST".to_string()),
+            username: Some("admin".to_string()),
+            os_version: Some("Windows 10".to_string()),
+            tag: Some("default".to_string()),
+            is_elevated: true,
+            beacon_interval: 30,
+            listener_id: None,
+            first_seen: Some("2025-01-01T00:00:00Z".to_string()),
+            last_seen: Some("2025-01-01T00:00:00Z".to_string()),
+            country: Some("China".to_string()),
+            country_code: Some("CN".to_string()),
+        };
+        db.save_client(&record).unwrap();
+        
+        let all = db.get_all_clients().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].hostname, Some("PC-TEST".to_string()));
+        assert!(all[0].is_elevated);
+        
+        // 更新 last_seen
+        db.update_client_last_seen("c1", "2025-06-01T00:00:00Z").unwrap();
+        let all = db.get_all_clients().unwrap();
+        assert_eq!(all[0].last_seen, Some("2025-06-01T00:00:00Z".to_string()));
+        
+        // 删除
+        db.delete_client("c1").unwrap();
+        assert!(db.get_all_clients().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_save_client_upsert() {
+        let db = make_temp_db();
+        
+        let mut record = ClientRecord {
+            id: "c1".to_string(),
+            ip_address: Some("1.1.1.1".to_string()),
+            hostname: Some("OLD".to_string()),
+            username: None,
+            os_version: None,
+            tag: None,
+            is_elevated: false,
+            beacon_interval: 30,
+            listener_id: None,
+            first_seen: None,
+            last_seen: None,
+            country: None,
+            country_code: None,
+        };
+        db.save_client(&record).unwrap();
+        
+        // 用相同 id 再次保存（upsert）
+        record.hostname = Some("NEW".to_string());
+        db.save_client(&record).unwrap();
+        
+        let all = db.get_all_clients().unwrap();
+        assert_eq!(all.len(), 1);
+        assert_eq!(all[0].hostname, Some("NEW".to_string()));
+    }
+
+    #[test]
+    fn test_shell_history() {
+        let db = make_temp_db();
+        
+        db.log_shell_command("c1", "whoami", Some("root"), true).unwrap();
+        db.log_shell_command("c1", "ls /root", None, false).unwrap();
+        db.log_shell_command("c1", "pwd", Some("/root"), true).unwrap();
+        
+        let history = db.get_shell_history("c1", 10).unwrap();
+        assert_eq!(history.len(), 3);
+        
+        // 验证所有命令都被记录
+        let commands: Vec<&str> = history.iter().map(|h| h.command.as_str()).collect();
+        assert!(commands.contains(&"whoami"));
+        assert!(commands.contains(&"ls /root"));
+        assert!(commands.contains(&"pwd"));
+        
+        // limit 生效
+        let limited = db.get_shell_history("c1", 1).unwrap();
+        assert_eq!(limited.len(), 1);
+        
+        // 不同 client_id 隔离
+        let other = db.get_shell_history("c2", 10).unwrap();
+        assert!(other.is_empty());
+    }
+
+    #[test]
+    fn test_operation_log() {
+        let db = make_temp_db();
+        db.log_operation(Some("c1"), "shell", "executed whoami", true).unwrap();
+        db.log_operation(None, "listener", "started on :4444", true).unwrap();
+        // 不 panic 即通过
+    }
+}

@@ -35,3 +35,6 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 
 # Shared library
 shared = { path = "../shared" }
+
+[dev-dependencies]
+tempfile = "3"

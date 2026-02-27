@@ -195,4 +195,116 @@ mod tests {
             _ => panic!("Wrong message type"),
         }
     }
+    
+    #[test]
+    fn test_shell_execute_roundtrip() {
+        let msg = Message::ShellExecute(ShellExecute { command: "whoami".to_string() });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::ShellExecute(s) => assert_eq!(s.command, "whoami"),
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_shell_response_roundtrip() {
+        let msg = Message::ShellExecuteResponse(ShellExecuteResponse {
+            output: "root\n".to_string(),
+            is_error: false,
+        });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::ShellExecuteResponse(r) => {
+                assert_eq!(r.output, "root\n");
+                assert!(!r.is_error);
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_exit_roundtrip() {
+        let msg = Message::Exit;
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        assert!(matches!(decoded, Message::Exit));
+    }
+    
+    #[test]
+    fn test_set_beacon_interval_roundtrip() {
+        let msg = Message::SetBeaconInterval(SetBeaconInterval { interval_seconds: 60 });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::SetBeaconInterval(s) => assert_eq!(s.interval_seconds, 60),
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_directory_listing_roundtrip() {
+        let msg = Message::GetDirectoryListing(GetDirectoryListing { path: "C:\\".to_string() });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::GetDirectoryListing(g) => assert_eq!(g.path, "C:\\"),
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_file_download_roundtrip() {
+        let msg = Message::FileDownload(FileDownload { path: "/etc/passwd".to_string() });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::FileDownload(f) => assert_eq!(f.path, "/etc/passwd"),
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_file_upload_roundtrip() {
+        let msg = Message::FileUpload(FileUpload {
+            path: "/tmp/test.txt".to_string(),
+            data: vec![1, 2, 3, 4, 5],
+            is_complete: true,
+        });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::FileUpload(f) => {
+                assert_eq!(f.path, "/tmp/test.txt");
+                assert_eq!(f.data, vec![1, 2, 3, 4, 5]);
+                assert!(f.is_complete);
+            }
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_file_delete_roundtrip() {
+        let msg = Message::FileDelete(FileDelete { path: "/tmp/junk".to_string() });
+        let bytes = msg.serialize().unwrap();
+        let decoded = Message::deserialize(&bytes).unwrap();
+        
+        match decoded {
+            Message::FileDelete(f) => assert_eq!(f.path, "/tmp/junk"),
+            _ => panic!("Wrong message type"),
+        }
+    }
+    
+    #[test]
+    fn test_deserialize_garbage_fails() {
+        let garbage = vec![0xFF, 0xFE, 0xFD, 0xFC];
+        assert!(Message::deserialize(&garbage).is_err());
+    }
 }

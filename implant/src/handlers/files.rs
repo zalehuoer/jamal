@@ -208,3 +208,121 @@ pub fn delete_file(req: &FileDelete) -> FileDeleteResponse {
         },
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    #[test]
+    fn test_list_directory_normal() {
+        let dir = tempfile::tempdir().unwrap();
+        
+        // 创建一些测试文件和子目录
+        std::fs::File::create(dir.path().join("file1.txt")).unwrap();
+        std::fs::File::create(dir.path().join("file2.dat")).unwrap();
+        std::fs::create_dir(dir.path().join("subdir")).unwrap();
+        
+        let req = GetDirectoryListing { path: dir.path().to_string_lossy().to_string() };
+        let result = get_directory_listing(&req);
+        
+        assert!(result.error.is_none());
+        assert_eq!(result.entries.len(), 3);
+        
+        // 目录应排在前面
+        assert!(result.entries[0].is_dir);
+        assert_eq!(result.entries[0].name, "subdir");
+    }
+
+    #[test]
+    fn test_list_directory_not_exists() {
+        let req = GetDirectoryListing { path: "Z:\\nonexistent_dir_xyz_123".to_string() };
+        let result = get_directory_listing(&req);
+        assert!(result.error.is_some());
+    }
+
+    #[test]
+    fn test_list_directory_file_path() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test.txt");
+        std::fs::File::create(&file_path).unwrap();
+        
+        let req = GetDirectoryListing { path: file_path.to_string_lossy().to_string() };
+        let result = get_directory_listing(&req);
+        assert!(result.error.is_some());
+        assert!(result.error.unwrap().contains("not a directory"));
+    }
+
+    #[test]
+    fn test_file_upload_download_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test_upload.bin");
+        let content = vec![0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0xFF];
+        
+        // 上传
+        let upload_req = FileUpload {
+            path: file_path.to_string_lossy().to_string(),
+            data: content.clone(),
+            is_complete: true,
+        };
+        let upload_result = upload_file(&upload_req);
+        assert!(upload_result.success);
+        assert!(upload_result.error.is_none());
+        
+        // 下载
+        let download_req = FileDownload { path: file_path.to_string_lossy().to_string() };
+        let download_result = download_file(&download_req);
+        assert!(download_result.error.is_none());
+        assert_eq!(download_result.data, content);
+        assert!(download_result.is_complete);
+    }
+
+    #[test]
+    fn test_download_nonexistent_file() {
+        let result = download_file(&FileDownload { path: "Z:\\no_such_file_xyz.bin".to_string() });
+        assert!(result.error.is_some());
+        assert!(result.data.is_empty());
+    }
+
+    #[test]
+    fn test_download_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let result = download_file(&FileDownload { path: dir.path().to_string_lossy().to_string() });
+        assert!(result.error.is_some());
+        assert!(result.error.unwrap().contains("directory"));
+    }
+
+    #[test]
+    fn test_delete_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("to_delete.txt");
+        let mut f = std::fs::File::create(&file_path).unwrap();
+        f.write_all(b"delete me").unwrap();
+        drop(f);
+        
+        let req = FileDelete { path: file_path.to_string_lossy().to_string() };
+        let result = delete_file(&req);
+        assert!(result.success);
+        assert!(!file_path.exists());
+    }
+
+    #[test]
+    fn test_delete_nonexistent_file() {
+        let result = delete_file(&FileDelete { path: "Z:\\no_such_file_xyz.bin".to_string() });
+        assert!(!result.success);
+        assert!(result.error.is_some());
+    }
+
+    #[test]
+    fn test_delete_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let sub = dir.path().join("sub");
+        std::fs::create_dir(&sub).unwrap();
+        std::fs::File::create(sub.join("inner.txt")).unwrap();
+        
+        let req = FileDelete { path: sub.to_string_lossy().to_string() };
+        let result = delete_file(&req);
+        assert!(result.success);
+        assert!(!sub.exists());
+    }
+}

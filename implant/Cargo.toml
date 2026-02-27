@@ -28,6 +28,9 @@ codegen-units = 1   # 单代码生成单元
 panic = "abort"     # 不展开 panic
 strip = true        # 剥离符号
 
+[dev-dependencies]
+tempfile = "3"
+
 [[bin]]
 name = "implant"
 path = "src/main.rs"

