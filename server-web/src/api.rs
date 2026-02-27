@@ -723,6 +723,7 @@ async fn download_built_implant(
 /// 查找 implant 源码目录
 fn find_implant_dir() -> Option<std::path::PathBuf> {
     let candidates = [
+        std::path::PathBuf::from("./implant"),
         std::path::PathBuf::from("../implant"),
         std::path::PathBuf::from("../../implant"),
         std::path::PathBuf::from("/opt/jamalc2/implant"),
@@ -828,6 +829,7 @@ fn copy_dir_recursive(src: &std::path::PathBuf, dst: &std::path::PathBuf) -> std
 /// 查找 C implant 源码目录
 fn find_implant_c_dir() -> Option<std::path::PathBuf> {
     let candidates = [
+        std::path::PathBuf::from("./implant-c"),
         std::path::PathBuf::from("../implant-c"),
         std::path::PathBuf::from("../../implant-c"),
         std::path::PathBuf::from("/opt/jamalc2/implant-c"),
