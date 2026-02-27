@@ -128,46 +128,233 @@ npm install
 
 ## 🐧 Linux 服务端部署（Docker）
 
-适用于部署到 Linux VPS/云服务器，通过浏览器访问 Web 管理界面。
+适用于部署到 Linux VPS / 云服务器，通过浏览器访问 Web 管理界面。
 
-### 方式一：一键部署
+---
+
+### 环境要求
+
+| 项目 | 要求 |
+|------|------|
+| 操作系统 | Ubuntu 20.04+ / Debian 11+ |
+| 权限 | root 用户 |
+| 内存 | ≥ 2GB（编译 Implant 需要） |
+| 硬盘 | ≥ 5GB 可用空间 |
+| 网络 | 国内 / 国外服务器均支持（自动适配镜像源） |
+
+> **注意**：Docker 和 Docker Compose 不需要提前安装，部署脚本会自动安装。
+
+---
+
+### 一键部署
 
 ```bash
-# 克隆项目
-git clone https://github.com/zalehuoer/jamal.git
+# 1. 克隆项目
+git clone https://gitee.com/newrldluv/jamal.git   # 国内
+# git clone https://github.com/zalehuoer/jamal.git # 国外
 cd jamal
 
-# 运行部署脚本
+# 2. 运行部署脚本
 chmod +x deploy.sh
 ./deploy.sh
 ```
 
-### 方式二：手动 Docker 部署
+部署脚本会自动完成以下步骤：
+1. 探测网络环境（国内 / 国外）
+2. 安装 Docker + Docker Compose（国内使用阿里云镜像）
+3. 配置 Docker 镜像加速器（仅国内）
+4. 构建 Docker 镜像（含 Rust 编译环境 + MinGW 交叉编译环境）
+5. 启动容器
 
-```bash
-# 构建镜像
-docker compose build
+> ⏱️ 首次构建需要 **10~30 分钟**（取决于网速和机器配置），后续重新部署会利用缓存，速度更快。
 
-# 启动服务
-docker compose up -d
+---
 
-# 查看日志
-docker compose logs -f
+### 部署成功后
 
-# 停止服务
-docker compose down
+部署完成后会显示：
+
+```
+=========================================
+[+] JamalC2 已启动!
+    Web 面板: https://<IP>:443
+    C2 监听:  默认端口 80 (可在面板中修改)
+
+    查看日志: docker compose logs -f
+    停止服务: docker compose down
+=========================================
 ```
 
-### 配置端口
+**打开浏览器访问 `http://<服务器IP>:443`**，输入以下凭据登录：
 
-编辑 `docker-compose.yml`：
+| 项目 | 默认值 | 环境变量 |
+|------|--------|----------|
+| 用户名 | `admin` | `JAMAL_USERNAME` |
+| 密码 | `jamal123` | `JAMAL_PASSWORD` |
+
+---
+
+### 端口说明
+
+| 端口 | 用途 | 说明 |
+|------|------|------|
+| **443** | Web 管理面板 | 浏览器访问此端口管理 C2 |
+| **80** | C2 Listener 默认端口 | Implant 回连此端口，可在面板中自定义修改 |
+
+如需自定义 Web 面板端口，编辑 `docker-compose.yml`：
 
 ```yaml
 ports:
-  - "4444:4444"  # 修改左边的端口号
+  - "你的端口:443"   # Web UI（左边改成你想要的端口）
+  - "80:80"          # C2 Listener
+environment:
+  - JAMAL_WEB_PORT=443
+```
+
+如果 C2 Listener 使用非 80 端口，需在 `ports` 中增加映射：
+
+```yaml
+ports:
+  - "443:443"
+  - "80:80"
+  - "8443:8443"   # 如果监听器使用 8443
 ```
 
 ---
+
+### 修改登录密码
+
+编辑 `docker-compose.yml`，在 `environment` 中添加：
+
+```yaml
+environment:
+  - JAMAL_WEB_PORT=443
+  - JAMAL_USERNAME=你的用户名
+  - JAMAL_PASSWORD=你的密码
+  - RUST_LOG=info
+```
+
+修改后重启服务生效：
+
+```bash
+docker compose down
+docker compose up -d
+```
+
+---
+
+### 服务管理
+
+#### 查看运行状态
+
+```bash
+cd ~/jamal
+docker compose ps
+```
+
+#### 查看实时日志
+
+```bash
+docker compose logs -f
+```
+
+按 `Ctrl+C` 退出日志查看（不会停止服务）。
+
+#### 停止服务
+
+```bash
+docker compose down
+```
+
+#### 重新启动
+
+```bash
+docker compose up -d
+```
+
+#### 更新到最新版本
+
+```bash
+cd ~/jamal
+docker compose down      # 停止服务
+git pull                 # 拉取最新代码
+docker compose build     # 重新构建镜像
+docker compose up -d     # 启动服务
+```
+
+#### 完全重置（清除所有数据）
+
+```bash
+docker compose down -v   # -v 会删除数据卷（包含数据库和监听器配置）
+docker compose build --no-cache  # 不使用缓存重新构建
+docker compose up -d
+```
+
+---
+
+### 防火墙配置
+
+如果服务器有防火墙，需要放行端口：
+
+```bash
+# Ubuntu (ufw)
+ufw allow 443/tcp
+ufw allow 80/tcp
+
+# CentOS (firewalld)
+firewall-cmd --permanent --add-port=443/tcp
+firewall-cmd --permanent --add-port=80/tcp
+firewall-cmd --reload
+```
+
+> **云服务器**还需要在**云厂商控制台的安全组**中放行对应端口。
+
+---
+
+### 故障排除
+
+#### Docker 安装失败（`Connection reset by peer`）
+
+国内服务器无法访问 `get.docker.com`。确保使用最新版 `deploy.sh`，它会自动使用阿里云镜像。
+
+#### Docker 镜像拉取失败
+
+容器内拉取 Docker Hub 镜像超时。检查镜像加速器配置：
+
+```bash
+cat /etc/docker/daemon.json
+```
+
+如果内容不正确或文件不存在，手动配置：
+
+```bash
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json <<EOF
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me"
+  ]
+}
+EOF
+systemctl restart docker
+```
+
+#### `Cargo.lock` 版本不兼容
+
+报错 `lock file version 4 was found`：Dockerfile 中 Rust 版本过旧，确保使用 `rust:1.85-slim-bookworm` 或更新版本。
+
+#### Rust Implant 编译失败（`openssl-sys`）
+
+报错 `Could not find directory of OpenSSL installation`：运行时容器缺少 `pkg-config` 和 `libssl-dev`，确保 Dockerfile 运行时阶段包含这两个包。
+
+#### C Implant 编译失败（`source directory not found`）
+
+报错 `C Implant source directory not found`：`implant-c` 目录路径未被正确识别，确保代码已更新到最新版本。
+
+#### 日志中大量 `Decryption failed: CryptoError`
+
+有旧版本的 Implant 使用过期的加密密钥在连接服务器。这不影响服务器运行，需要在目标机器上关闭旧 Implant 并部署新版本。
 
 ## 🚀 快速开始
 
