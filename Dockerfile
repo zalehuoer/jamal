@@ -24,12 +24,12 @@ WORKDIR /app/server-web
 # 构建 Release 版本
 RUN cargo build --release
 
-# 阶段2: 运行时
-FROM debian:bookworm-slim
+# 阶段2: 运行时 (需要 cargo 编译 Rust Implant + MinGW 编译 C Implant)
+FROM rust:1.85-slim-bookworm
 
 WORKDIR /app
 
-# 安装运行时依赖 (含 MinGW-w64 用于运行时编译 C Implant)
+# 安装运行时依赖 (MinGW-w64 用于交叉编译 C Implant)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
     mingw-w64 \
