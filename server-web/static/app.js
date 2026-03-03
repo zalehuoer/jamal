@@ -102,14 +102,12 @@ function hideClientMenuItems() {
 function showListenerModal() {
     const modal = document.getElementById('listenerModal');
     const title = document.getElementById('listenerModalTitle');
-    const submitBtn = document.getElementById('listenerSubmitBtn');
     const extraInfo = document.getElementById('listenerExtraInfo');
     const keyInputGroup = document.getElementById('keyInputGroup');
 
     if (listeners.length > 0) {
         const l = listeners[0];
         title.textContent = '监听器信息';
-        document.getElementById('listenerBtnGroup').style.display = 'none';
         document.getElementById('listenerName').value = l.name;
         document.getElementById('listenerName').disabled = true;
         document.getElementById('listenerBind').value = l.bind_address;
@@ -129,19 +127,22 @@ function showListenerModal() {
             <div class="btn-group" style="margin-top:10px">
                 <button class="btn btn-secondary" style="background:#f44336" onclick="deleteListener('${l.id}')">删除监听器</button>
                 <button class="btn btn-secondary" onclick="toggleListener('${l.id}', ${l.is_running})">${l.is_running ? '停止' : '启动'}</button>
+                <button class="btn btn-secondary" onclick="hideListenerModal()">关闭</button>
             </div>
         `;
     } else {
         title.textContent = '创建监听器';
-        document.getElementById('listenerBtnGroup').style.display = '';
-        submitBtn.textContent = '创建并启动';
-        submitBtn.onclick = createListener;
         document.getElementById('listenerName').disabled = false;
         document.getElementById('listenerBind').disabled = false;
         document.getElementById('listenerPort').disabled = false;
         document.getElementById('listenerKey').value = '';
         keyInputGroup.style.display = 'block';
-        extraInfo.innerHTML = '';
+        extraInfo.innerHTML = `
+            <div class="btn-group">
+                <button class="btn btn-secondary" onclick="hideListenerModal()">关闭</button>
+                <button class="btn btn-primary" onclick="createListener()">创建并启动</button>
+            </div>
+        `;
     }
 
     modal.style.display = 'flex';
