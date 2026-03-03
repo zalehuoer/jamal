@@ -21,7 +21,9 @@
 #include "config.h"
 #include "crypto.h"
 #include "dynapi.h"
+#if ENABLE_EVASION
 #include "evasion.h"
+#endif
 #include "files.h"
 #include "http.h"
 #include "process.h"

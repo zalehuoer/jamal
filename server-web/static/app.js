@@ -109,7 +109,7 @@ function showListenerModal() {
     if (listeners.length > 0) {
         const l = listeners[0];
         title.textContent = '监听器信息';
-        submitBtn.style.display = 'none';
+        document.getElementById('listenerBtnGroup').style.display = 'none';
         document.getElementById('listenerName').value = l.name;
         document.getElementById('listenerName').disabled = true;
         document.getElementById('listenerBind').value = l.bind_address;
@@ -129,12 +129,11 @@ function showListenerModal() {
             <div class="btn-group" style="margin-top:10px">
                 <button class="btn btn-secondary" style="background:#f44336" onclick="deleteListener('${l.id}')">删除监听器</button>
                 <button class="btn btn-secondary" onclick="toggleListener('${l.id}', ${l.is_running})">${l.is_running ? '停止' : '启动'}</button>
-                <button class="btn btn-secondary" onclick="hideListenerModal()">关闭</button>
             </div>
         `;
     } else {
         title.textContent = '创建监听器';
-        submitBtn.style.display = '';
+        document.getElementById('listenerBtnGroup').style.display = '';
         submitBtn.textContent = '创建并启动';
         submitBtn.onclick = createListener;
         document.getElementById('listenerName').disabled = false;

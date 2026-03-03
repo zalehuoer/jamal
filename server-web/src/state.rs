@@ -124,11 +124,15 @@ pub struct AppState {
 
 impl AppState {
     pub fn new() -> Self {
-        // 初始化数据库
-        let db_path = dirs::data_dir()
-            .unwrap_or_else(|| std::path::PathBuf::from("."))
-            .join("jamalc2")
-            .join("jamalc2.db");
+        // 初始化数据库（优先使用 JAMAL_DATA_DIR 环境变量，兼容 Docker 卷挂载）
+        let db_dir = std::env::var("JAMAL_DATA_DIR")
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(|_| {
+                dirs::data_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join("jamalc2")
+            });
+        let db_path = db_dir.join("jamalc2.db");
         
         let db = Database::new(db_path).ok();
         
