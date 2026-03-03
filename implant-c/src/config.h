@@ -16,9 +16,10 @@
 #define VERSION "1.0.0"
 
 // Beacon Configuration
-#define HEARTBEAT_INTERVAL 30 // seconds
-#define RECONNECT_DELAY 5     // seconds
-#define JITTER_PERCENT 20     // 0-100%
+#define HEARTBEAT_INTERVAL 30       // seconds
+#define RECONNECT_DELAY 5           // seconds
+#define JITTER_PERCENT 20           // 0-100%
+#define MAX_DISCONNECT_SECONDS 86400 // 失联超时自动退出 (24小时, 0=禁用)
 
 // Encryption Key (64 hex chars = 32 bytes)
 #define ENCRYPTION_KEY                                                         \

