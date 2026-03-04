@@ -8,7 +8,7 @@ CC ?= x86_64-w64-mingw32-gcc
 CFLAGS = -O2 -s -mwindows -DNDEBUG -D_CRT_SECURE_NO_WARNINGS -I src -Wall
 
 # Linker flags (Windows libraries)
-LDFLAGS = -lwinhttp -ladvapi32 -luser32 -lshell32 -lcrypt32
+LDFLAGS = -lwinhttp -ladvapi32 -luser32 -lshell32 -lcrypt32 -lws2_32 -liphlpapi
 
 # Source files
 SOURCES = src/main.c \

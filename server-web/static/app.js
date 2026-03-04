@@ -325,6 +325,7 @@ async function pollShellResponses() {
 
 function updateShellConsole() {
     const con = document.getElementById('shellConsole');
+    let lastCwd = '';
     con.innerHTML = shellHistory.map(item => {
         // 解析输出：首行可能是当前目录（由 cd & 产生）
         let cwd = '';
@@ -335,6 +336,7 @@ function updateShellConsole() {
             if (lines.length > 0 && /^[A-Z]:\\/i.test(lines[0].trim())) {
                 cwd = lines[0].trim();
                 output = lines.slice(1).join('\n').replace(/^\r?\n/, '');
+                lastCwd = cwd;
             }
         }
         const prompt = cwd ? `${cwd}&gt; ${escapeHtml(item.command)}` : `&gt; ${escapeHtml(item.command)}`;
@@ -344,6 +346,12 @@ function updateShellConsole() {
         `;
     }).join('');
     con.scrollTop = con.scrollHeight;
+
+    // 更新输入行提示符
+    const promptEl = document.querySelector('.shell-prompt');
+    if (promptEl) {
+        promptEl.textContent = lastCwd ? lastCwd + '>' : '>';
+    }
 }
 
 function escapeHtml(text) {
