@@ -39,6 +39,33 @@ static char *gbk_to_utf8(const char *gbk_str) {
   return utf8_str;
 }
 
+// Convert UTF-8 to local codepage (e.g. GBK on Chinese Windows)
+// Used for path arguments from web frontend (UTF-8) -> Windows API (ANSI)
+static char *utf8_to_local(const char *utf8_str) {
+  if (!utf8_str || !*utf8_str)
+    return safe_strdup("");
+
+  int wide_len = MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, NULL, 0);
+  if (wide_len <= 0)
+    return safe_strdup(utf8_str);
+
+  wchar_t *wide_str = (wchar_t *)safe_malloc(wide_len * sizeof(wchar_t));
+  MultiByteToWideChar(CP_UTF8, 0, utf8_str, -1, wide_str, wide_len);
+
+  int local_len =
+      WideCharToMultiByte(CP_ACP, 0, wide_str, -1, NULL, 0, NULL, NULL);
+  if (local_len <= 0) {
+    free(wide_str);
+    return safe_strdup(utf8_str);
+  }
+
+  char *local_str = (char *)safe_malloc(local_len);
+  WideCharToMultiByte(CP_ACP, 0, wide_str, -1, local_str, local_len, NULL,
+                      NULL);
+  free(wide_str);
+  return local_str;
+}
+
 // Case-insensitive command match, returns pointer to args (or NULL)
 static const char *cmd_match(const char *input, const char *cmd) {
   size_t len = strlen(cmd);
@@ -82,7 +109,10 @@ static char *builtin_cd(const char *args) {
   args = skip_spaces(args);
 
   if (*args) {
-    if (!SetCurrentDirectoryA(args)) {
+    char *local_path = utf8_to_local(args);
+    BOOL ok = SetCurrentDirectoryA(local_path);
+    free(local_path);
+    if (!ok) {
       char err[512];
       snprintf(err, sizeof(err), "Cannot change to directory: %s", args);
       return safe_strdup(err);
@@ -132,21 +162,24 @@ static char *builtin_dir(const char *args) {
 
   args = skip_spaces(args);
 
-  // Build search path
-  if (*args) {
-    // Check if path is a directory (append \* if so)
-    DWORD attr = GetFileAttributesA(args);
+  // Build search path (convert UTF-8 to local codepage)
+  char *local_args = (*args) ? utf8_to_local(args) : NULL;
+  const char *path = local_args ? local_args : NULL;
+
+  if (path) {
+    DWORD attr = GetFileAttributesA(path);
     if (attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY)) {
-      snprintf(search_path, MAX_PATH, "%s\\*", args);
+      snprintf(search_path, MAX_PATH, "%s\\*", path);
     } else {
-      strncpy(search_path, args, MAX_PATH - 1);
+      strncpy(search_path, path, MAX_PATH - 1);
       search_path[MAX_PATH - 1] = '\0';
     }
   } else {
-    // Current directory
     GetCurrentDirectoryA(MAX_PATH - 2, search_path);
     strcat(search_path, "\\*");
   }
+  if (local_args)
+    free(local_args);
 
   result = safe_malloc(result_size);
 
@@ -222,8 +255,10 @@ static char *builtin_type(const char *args) {
   if (!*args)
     return safe_strdup("Usage: type <filename>");
 
-  HANDLE hFile = CreateFileA(args, GENERIC_READ, FILE_SHARE_READ, NULL,
+  char *local_path = utf8_to_local(args);
+  HANDLE hFile = CreateFileA(local_path, GENERIC_READ, FILE_SHARE_READ, NULL,
                              OPEN_EXISTING, 0, NULL);
+  free(local_path);
   if (hFile == INVALID_HANDLE_VALUE) {
     char err[512];
     snprintf(err, sizeof(err), "Cannot open file: %s", args);
@@ -236,7 +271,7 @@ static char *builtin_type(const char *args) {
     return safe_strdup("File too large (max 10MB) or error reading size");
   }
 
-  char *content = safe_malloc(file_size + 1);
+  char *content = safe_malloc(file_size + 2); // +2 for wchar null
   DWORD bytes_read;
   if (!ReadFile(hFile, content, file_size, &bytes_read, NULL)) {
     CloseHandle(hFile);
@@ -244,8 +279,36 @@ static char *builtin_type(const char *args) {
     return safe_strdup("Error reading file");
   }
   CloseHandle(hFile);
-  content[bytes_read] = '\0';
 
+  // Detect encoding by BOM
+  if (bytes_read >= 2 && (unsigned char)content[0] == 0xFF &&
+      (unsigned char)content[1] == 0xFE) {
+    // UTF-16 LE BOM - convert wide string to UTF-8
+    wchar_t *wide = (wchar_t *)(content + 2);
+    int wchar_count = (bytes_read - 2) / sizeof(wchar_t);
+    int utf8_len =
+        WideCharToMultiByte(CP_UTF8, 0, wide, wchar_count, NULL, 0, NULL, NULL);
+    char *utf8 = safe_malloc(utf8_len + 1);
+    WideCharToMultiByte(CP_UTF8, 0, wide, wchar_count, utf8, utf8_len, NULL,
+                        NULL);
+    utf8[utf8_len] = '\0';
+    free(content);
+    return utf8;
+  }
+
+  if (bytes_read >= 3 && (unsigned char)content[0] == 0xEF &&
+      (unsigned char)content[1] == 0xBB && (unsigned char)content[2] == 0xBF) {
+    // UTF-8 BOM - skip BOM, already UTF-8
+    size_t len = bytes_read - 3;
+    char *utf8 = safe_malloc(len + 1);
+    memcpy(utf8, content + 3, len);
+    utf8[len] = '\0';
+    free(content);
+    return utf8;
+  }
+
+  // Default: assume local codepage (GBK etc.) -> UTF-8
+  content[bytes_read] = '\0';
   char *utf8 = gbk_to_utf8(content);
   free(content);
   return utf8;
@@ -257,7 +320,10 @@ static char *builtin_mkdir(const char *args) {
   if (!*args)
     return safe_strdup("Usage: mkdir <directory>");
 
-  if (CreateDirectoryA(args, NULL)) {
+  char *local_path = utf8_to_local(args);
+  BOOL ok = CreateDirectoryA(local_path, NULL);
+  free(local_path);
+  if (ok) {
     return safe_strdup("Directory created");
   } else {
     char err[512];
@@ -273,7 +339,10 @@ static char *builtin_rmdir(const char *args) {
   if (!*args)
     return safe_strdup("Usage: rmdir <directory>");
 
-  if (RemoveDirectoryA(args)) {
+  char *local_path = utf8_to_local(args);
+  BOOL ok = RemoveDirectoryA(local_path);
+  free(local_path);
+  if (ok) {
     return safe_strdup("Directory removed");
   } else {
     char err[512];
@@ -290,7 +359,10 @@ static char *builtin_del(const char *args) {
   if (!*args)
     return safe_strdup("Usage: del <filename>");
 
-  if (DeleteFileA(args)) {
+  char *local_path = utf8_to_local(args);
+  BOOL ok = DeleteFileA(local_path);
+  free(local_path);
+  if (ok) {
     return safe_strdup("File deleted");
   } else {
     char err[512];
@@ -355,7 +427,12 @@ static char *builtin_copy(const char *args) {
   if (parse_two_args(args, src, dst, MAX_PATH) != 0)
     return safe_strdup("Usage: copy <source> <destination>");
 
-  if (CopyFileA(src, dst, FALSE)) {
+  char *local_src = utf8_to_local(src);
+  char *local_dst = utf8_to_local(dst);
+  BOOL ok = CopyFileA(local_src, local_dst, FALSE);
+  free(local_src);
+  free(local_dst);
+  if (ok) {
     return safe_strdup("File copied");
   } else {
     char err[512];
@@ -370,7 +447,12 @@ static char *builtin_move(const char *args) {
   if (parse_two_args(args, src, dst, MAX_PATH) != 0)
     return safe_strdup("Usage: move <source> <destination>");
 
-  if (MoveFileA(src, dst)) {
+  char *local_src = utf8_to_local(src);
+  char *local_dst = utf8_to_local(dst);
+  BOOL ok = MoveFileA(local_src, local_dst);
+  free(local_src);
+  free(local_dst);
+  if (ok) {
     return safe_strdup("File moved");
   } else {
     char err[512];
@@ -534,30 +616,44 @@ char *shell_execute(const char *command) {
     return result;                                                             \
   } while (0)
 
+  // Helper: args starting with / or - are flags, builtin can't handle them
+#define HAS_FLAG(a) ((a) && (*(a) == '/' || *(a) == '-'))
+
   if ((args = cmd_match(command, "dir")) || (args = cmd_match(command, "ls")))
-    BUILTIN_WRAP(builtin_dir(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_dir(args));
   if ((args = cmd_match(command, "type")) || (args = cmd_match(command, "cat")))
-    BUILTIN_WRAP(builtin_type(args));
-  if (cmd_match(command, "whoami"))
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_type(args));
+  if ((args = cmd_match(command, "whoami")) && !*args)
     BUILTIN_WRAP(builtin_whoami());
-  if (cmd_match(command, "hostname"))
+  if ((args = cmd_match(command, "hostname")) && !*args)
     BUILTIN_WRAP(builtin_hostname());
   if ((args = cmd_match(command, "mkdir")) || (args = cmd_match(command, "md")))
-    BUILTIN_WRAP(builtin_mkdir(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_mkdir(args));
   if ((args = cmd_match(command, "rmdir")) || (args = cmd_match(command, "rd")))
-    BUILTIN_WRAP(builtin_rmdir(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_rmdir(args));
   if ((args = cmd_match(command, "del")) || (args = cmd_match(command, "rm")))
-    BUILTIN_WRAP(builtin_del(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_del(args));
   if ((args = cmd_match(command, "copy")) || (args = cmd_match(command, "cp")))
-    BUILTIN_WRAP(builtin_copy(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_copy(args));
   if ((args = cmd_match(command, "move")) || (args = cmd_match(command, "mv")))
-    BUILTIN_WRAP(builtin_move(args));
+    if (!HAS_FLAG(args))
+      BUILTIN_WRAP(builtin_move(args));
   // ipconfig/ifconfig: fallback to cmd.exe /c (MinGW compatibility)
   // tasklist/ps: fallback to cmd.exe /c (MinGW compatibility)
-  if (cmd_match(command, "env") || cmd_match(command, "set"))
+  if ((args = cmd_match(command, "env")) && !*args)
+    BUILTIN_WRAP(builtin_env());
+  if ((args = cmd_match(command, "set")) && !*args)
     BUILTIN_WRAP(builtin_env());
   if ((args = cmd_match(command, "echo")))
     BUILTIN_WRAP(builtin_echo(args));
+
+#undef HAS_FLAG
 
 #undef BUILTIN_WRAP
 

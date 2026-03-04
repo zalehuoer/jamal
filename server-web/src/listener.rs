@@ -615,33 +615,40 @@ fn get_client_ip(headers: &axum::http::HeaderMap, addr: &SocketAddr) -> String {
     addr.ip().to_string()
 }
 
-/// 通过 IP 获取国家信息（带超时保护）
+/// 通过 IP 获取国家信息（多 API Fallback + 超时保护）
 async fn get_country_from_ip(ip: &str) -> Option<String> {
     if ip == "127.0.0.1" || ip == "::1" || ip.starts_with("192.168.") || ip.starts_with("10.") || ip.starts_with("172.") {
         return Some("Local".to_string());
     }
     
-    let url = format!("http://ip-api.com/json/{}?fields=country,countryCode&lang=zh-CN", ip);
+    // 尝试多个 API，解决国内 VPS 无法访问某些 API 的问题
+    let apis: Vec<(String, &str)> = vec![
+        (format!("http://ip-api.com/json/{}?fields=country,countryCode&lang=zh-CN", ip), "country"),
+        (format!("https://ipwho.is/{}", ip), "country"),
+        (format!("https://ipapi.co/{}/json/", ip), "country_name"),
+    ];
     
-    // 2 秒超时，避免外部 API 不可用时长时间阻塞
-    let result = tokio::time::timeout(
-        std::time::Duration::from_secs(2),
-        reqwest::get(&url)
-    ).await;
+    let timeout = std::time::Duration::from_secs(5);
     
-    match result {
-        Ok(Ok(resp)) => {
-            if let Ok(json) = resp.json::<serde_json::Value>().await {
-                if let Some(country) = json.get("country").and_then(|c| c.as_str()) {
-                    return Some(country.to_string());
+    for (url, field) in &apis {
+        let result = tokio::time::timeout(timeout, reqwest::get(url)).await;
+        match result {
+            Ok(Ok(resp)) => {
+                if let Ok(json) = resp.json::<serde_json::Value>().await {
+                    if let Some(country) = json.get(*field).and_then(|c| c.as_str()) {
+                        if !country.is_empty() {
+                            println!("[+] IP {} -> {} (via {})", ip, country, url);
+                            return Some(country.to_string());
+                        }
+                    }
                 }
             }
-        }
-        Ok(Err(e)) => {
-            println!("[!] Failed to query IP location: {}", e);
-        }
-        Err(_) => {
-            println!("[!] IP location query timed out for {}", ip);
+            Ok(Err(e)) => {
+                println!("[!] IP location query failed ({}): {}", url, e);
+            }
+            Err(_) => {
+                println!("[!] IP location query timed out ({})", url);
+            }
         }
     }
     
