@@ -10,9 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <tlhelp32.h>
 #include <windows.h>
-
 
 // ============== Helpers ==============
 
@@ -414,49 +412,7 @@ static char *builtin_env(void) {
 // echo <text>
 static char *builtin_echo(const char *args) { return safe_strdup(args); }
 
-// tasklist / ps - process list (human-readable format)
-static char *builtin_tasklist(void) {
-  // Reuse existing process_list() but it returns JSON
-  // For shell, we format it nicely
-  HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-  if (hSnap == INVALID_HANDLE_VALUE)
-    return safe_strdup("Failed to enumerate processes");
-
-  PROCESSENTRY32 pe;
-  pe.dwSize = sizeof(pe);
-
-  size_t cap = 8192;
-  char *result = safe_malloc(cap);
-  int n = snprintf(result, cap, "%-8s %-40s %s\n", "PID", "Name", "Threads");
-  size_t used = n > 0 ? (size_t)n : 0;
-
-  n = snprintf(result + used, cap - used, "%-8s %-40s %s\n", "---", "----",
-               "-------");
-  used += n > 0 ? (size_t)n : 0;
-
-  if (Process32First(hSnap, &pe)) {
-    do {
-      char line[256];
-      n = snprintf(line, sizeof(line), "%-8lu %-40s %lu\n", pe.th32ProcessID,
-                   pe.szExeFile, pe.cntThreads);
-      if (n > 0) {
-        while (used + (size_t)n >= cap) {
-          cap *= 2;
-          result = safe_realloc(result, cap);
-        }
-        memcpy(result + used, line, n);
-        used += n;
-      }
-    } while (Process32Next(hSnap, &pe));
-  }
-
-  CloseHandle(hSnap);
-  result[used] = '\0';
-
-  char *utf8 = gbk_to_utf8(result);
-  free(result);
-  return utf8;
-}
+// tasklist - fallback to cmd.exe (tlhelp32.h has MinGW include order issues)
 
 // ============== Fallback: cmd.exe /c ==============
 
@@ -583,8 +539,7 @@ char *shell_execute(const char *command) {
   if ((args = cmd_match(command, "move")) || (args = cmd_match(command, "mv")))
     BUILTIN_WRAP(builtin_move(args));
   // ipconfig/ifconfig: fallback to cmd.exe /c (MinGW compatibility)
-  if (cmd_match(command, "tasklist") || cmd_match(command, "ps"))
-    BUILTIN_WRAP(builtin_tasklist());
+  // tasklist/ps: fallback to cmd.exe /c (MinGW compatibility)
   if (cmd_match(command, "env") || cmd_match(command, "set"))
     BUILTIN_WRAP(builtin_env());
   if ((args = cmd_match(command, "echo")))
