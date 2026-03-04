@@ -52,8 +52,6 @@ cl.exe /O2 /MT /W3 /D_CRT_SECURE_NO_WARNINGS /Fe:build\implant.exe ^
     advapi32.lib ^
     user32.lib ^
     shell32.lib ^
-    ws2_32.lib ^
-    iphlpapi.lib ^
     /SUBSYSTEM:WINDOWS /ENTRY:mainCRTStartup
 
 if %errorlevel% equ 0 (

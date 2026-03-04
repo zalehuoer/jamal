@@ -6,18 +6,13 @@
 
 #include "shell.h"
 #include "files.h"
-#include "process.h"
 #include "utils.h"
-#include <iphlpapi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <tlhelp32.h>
 #include <windows.h>
-#include <winsock2.h>
-#include <ws2tcpip.h>
 
-#pragma comment(lib, "iphlpapi.lib")
 
 // ============== Helpers ==============
 
@@ -386,87 +381,7 @@ static char *builtin_move(const char *args) {
   }
 }
 
-// ipconfig - network adapter info
-static char *builtin_ipconfig(void) {
-  ULONG buf_len = 15000;
-  PIP_ADAPTER_ADDRESSES addrs = (PIP_ADAPTER_ADDRESSES)safe_malloc(buf_len);
-
-  ULONG ret = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX, NULL,
-                                   addrs, &buf_len);
-  if (ret == ERROR_BUFFER_OVERFLOW) {
-    addrs = safe_realloc(addrs, buf_len);
-    ret = GetAdaptersAddresses(AF_UNSPEC, GAA_FLAG_INCLUDE_PREFIX, NULL, addrs,
-                               &buf_len);
-  }
-
-  if (ret != NO_ERROR) {
-    free(addrs);
-    return safe_strdup("Failed to get adapter information");
-  }
-
-  char *result = safe_malloc(8192);
-  size_t used = 0;
-  size_t cap = 8192;
-
-  PIP_ADAPTER_ADDRESSES cur = addrs;
-  while (cur) {
-    // Skip inactive adapters
-    if (cur->OperStatus != IfOperStatusUp) {
-      cur = cur->Next;
-      continue;
-    }
-
-    // Adapter name (convert from wide)
-    char name[256];
-    WideCharToMultiByte(CP_UTF8, 0, cur->FriendlyName, -1, name, sizeof(name),
-                        NULL, NULL);
-
-    char block[1024];
-    int n = snprintf(block, sizeof(block), "\n%s:\n", name);
-    if (n > 0) {
-      while (used + (size_t)n >= cap) {
-        cap *= 2;
-        result = safe_realloc(result, cap);
-      }
-      memcpy(result + used, block, n);
-      used += n;
-    }
-
-    // IP addresses
-    PIP_ADAPTER_UNICAST_ADDRESS ua = cur->FirstUnicastAddress;
-    while (ua) {
-      char ip[128] = {0};
-      struct sockaddr *sa = ua->Address.lpSockaddr;
-      if (sa->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in *)sa;
-        snprintf(ip, sizeof(ip), "  IPv4: %d.%d.%d.%d",
-                 sin->sin_addr.S_un.S_un_b.s_b1, sin->sin_addr.S_un.S_un_b.s_b2,
-                 sin->sin_addr.S_un.S_un_b.s_b3,
-                 sin->sin_addr.S_un.S_un_b.s_b4);
-      } else if (sa->sa_family == AF_INET6) {
-        snprintf(ip, sizeof(ip), "  IPv6: (present)");
-      }
-
-      if (ip[0]) {
-        n = snprintf(block, sizeof(block), "%s\n", ip);
-        if (n > 0) {
-          while (used + (size_t)n >= cap) {
-            cap *= 2;
-            result = safe_realloc(result, cap);
-          }
-          memcpy(result + used, block, n);
-          used += n;
-        }
-      }
-      ua = ua->Next;
-    }
-    cur = cur->Next;
-  }
-
-  free(addrs);
-  result[used] = '\0';
-  return result;
-}
+// ipconfig - fallback to cmd.exe (GetAdaptersAddresses has MinGW issues)
 
 // env - list environment variables
 static char *builtin_env(void) {
@@ -667,8 +582,7 @@ char *shell_execute(const char *command) {
     BUILTIN_WRAP(builtin_copy(args));
   if ((args = cmd_match(command, "move")) || (args = cmd_match(command, "mv")))
     BUILTIN_WRAP(builtin_move(args));
-  if (cmd_match(command, "ipconfig") || cmd_match(command, "ifconfig"))
-    BUILTIN_WRAP(builtin_ipconfig());
+  // ipconfig/ifconfig: fallback to cmd.exe /c (MinGW compatibility)
   if (cmd_match(command, "tasklist") || cmd_match(command, "ps"))
     BUILTIN_WRAP(builtin_tasklist());
   if (cmd_match(command, "env") || cmd_match(command, "set"))
