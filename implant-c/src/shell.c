@@ -508,6 +508,20 @@ char *shell_execute(const char *command) {
     free(raw);
     return result;
   }
+  // Handle bare drive letter: "C:" or "D:" etc.
+  if (((command[0] >= 'A' && command[0] <= 'Z') ||
+       (command[0] >= 'a' && command[0] <= 'z')) &&
+      command[1] == ':' && (command[2] == '\0' || command[2] == '\\')) {
+    char drive_path[4];
+    drive_path[0] = command[0];
+    drive_path[1] = ':';
+    drive_path[2] = '\\';
+    drive_path[3] = '\0';
+    raw = builtin_cd(drive_path);
+    result = prepend_cwd("");
+    free(raw);
+    return result;
+  }
   if (cmd_match(command, "pwd")) {
     return prepend_cwd("");
   }

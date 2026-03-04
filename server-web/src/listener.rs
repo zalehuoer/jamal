@@ -621,7 +621,7 @@ async fn get_country_from_ip(ip: &str) -> Option<String> {
         return Some("Local".to_string());
     }
     
-    let url = format!("http://ip-api.com/json/{}?fields=country,countryCode", ip);
+    let url = format!("http://ip-api.com/json/{}?fields=country,countryCode&lang=zh-CN", ip);
     
     // 2 秒超时，避免外部 API 不可用时长时间阻塞
     let result = tokio::time::timeout(
