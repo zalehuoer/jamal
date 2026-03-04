@@ -222,6 +222,27 @@ body {
     color: var(--text-primary);
 }
 
+.modal.modal-maximized {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    max-height: 100vh;
+    min-width: unset;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.modal.modal-maximized .shell-console {
+    flex: 1;
+    height: auto;
+}
+
+.modal.modal-maximized .file-list {
+    flex: 1;
+    height: auto;
+}
+
 /* Forms */
 .form-group {
     margin-bottom: 16px;

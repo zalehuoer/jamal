@@ -324,18 +324,37 @@ async function pollShellResponses() {
 }
 
 function updateShellConsole() {
-    const console = document.getElementById('shellConsole');
-    console.innerHTML = shellHistory.map(item => `
-        <div style="color:#4a9eff">&gt; ${item.command}</div>
-        <div class="${item.isError ? 'shell-error' : 'shell-output'}">${escapeHtml(item.output)}</div>
-    `).join('');
-    console.scrollTop = console.scrollHeight;
+    const con = document.getElementById('shellConsole');
+    con.innerHTML = shellHistory.map(item => {
+        // 解析输出：首行可能是当前目录（由 cd & 产生）
+        let cwd = '';
+        let output = item.output;
+        if (output && output !== '[等待响应...]') {
+            const lines = output.split('\n');
+            // 首行如果像路径（如 C:\Users\admin），提取为 CWD
+            if (lines.length > 0 && /^[A-Z]:\\/i.test(lines[0].trim())) {
+                cwd = lines[0].trim();
+                output = lines.slice(1).join('\n').replace(/^\r?\n/, '');
+            }
+        }
+        const prompt = cwd ? `${cwd}&gt; ${escapeHtml(item.command)}` : `&gt; ${escapeHtml(item.command)}`;
+        return `
+            <div style="color:#4a9eff">${prompt}</div>
+            <div class="${item.isError ? 'shell-error' : 'shell-output'}">${escapeHtml(output)}</div>
+        `;
+    }).join('');
+    con.scrollTop = con.scrollHeight;
 }
 
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
     return div.innerHTML;
+}
+
+function toggleMaximize(modalId) {
+    const modal = document.getElementById(modalId);
+    modal.classList.toggle('modal-maximized');
 }
 
 // ============== Client Actions ==============

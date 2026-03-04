@@ -71,9 +71,9 @@ char *shell_execute(const char *command) {
 
   ZeroMemory(&pi, sizeof(pi));
 
-  // Build command line
-  char cmdline[1024];
-  snprintf(cmdline, sizeof(cmdline), "cmd.exe /c %s", command);
+  // Build command line: prepend "cd &" to show current directory
+  char cmdline[2048];
+  snprintf(cmdline, sizeof(cmdline), "cmd.exe /c cd & %s", command);
 
   // Create process
   if (!CreateProcessA(NULL, cmdline, NULL, NULL, TRUE, CREATE_NO_WINDOW, NULL,

@@ -92,10 +92,13 @@
 
     <!-- Shell Modal -->
     <div id="shellModal" class="modal-overlay" style="display:none">
-        <div class="modal" onclick="event.stopPropagation()" style="min-width:800px">
+        <div id="shellModalInner" class="modal" onclick="event.stopPropagation()" style="min-width:800px">
             <div class="modal-header">
                 <h2 class="modal-title">远程 Shell - <span id="shellClientId"></span></h2>
-                <button class="modal-close" onclick="hideShellModal()">×</button>
+                <div style="display:flex;gap:8px">
+                    <button class="modal-close" onclick="toggleMaximize('shellModalInner')" title="最大化">□</button>
+                    <button class="modal-close" onclick="hideShellModal()">×</button>
+                </div>
             </div>
             <div id="shellConsole" class="shell-console"></div>
             <form onsubmit="sendShellCommand(event)" class="shell-input-container">
@@ -111,10 +114,13 @@
 
     <!-- File Manager Modal -->
     <div id="fileModal" class="modal-overlay" style="display:none">
-        <div class="modal" onclick="event.stopPropagation()" style="min-width:800px">
+        <div id="fileModalInner" class="modal" onclick="event.stopPropagation()" style="min-width:800px">
             <div class="modal-header">
                 <h2 class="modal-title">文件管理 - <span id="fileClientId"></span></h2>
-                <button class="modal-close" onclick="hideFileModal()">×</button>
+                <div style="display:flex;gap:8px">
+                    <button class="modal-close" onclick="toggleMaximize('fileModalInner')" title="最大化">□</button>
+                    <button class="modal-close" onclick="hideFileModal()">×</button>
+                </div>
             </div>
             <div class="file-toolbar">
                 <input id="filePath" class="form-input" value="" placeholder="留空显示驱动器列表" style="flex:1">
